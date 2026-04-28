@@ -5,3 +5,5 @@ pandas
 seaborn
 keras
 category_encoders 
+dvc
+dvclive

@@ -1,0 +1,12 @@
+# params.yaml
+data:
+  train_split: 0.8
+  random_seed: 42
+
+model:
+  epochs: 100
+  learning_rate: 0.01
+  dense_units: 10
+
+evaluate:
+  metrics_path: metrics.json

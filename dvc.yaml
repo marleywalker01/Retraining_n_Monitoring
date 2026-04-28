@@ -1,0 +1,37 @@
+# dvc.yaml
+stages:
+
+  train:
+    cmd: python src/model.py
+    deps:
+    - src/model.py
+    - params.yaml
+    params:
+    - model.epochs
+    - model.learning_rate
+    - model.dense_units
+    - data.train_split
+    - data.random_seed
+    outs:
+    - models/model.keras       # DVC tracks this output
+    - dvclive/                 # DVCLive logs
+    plots:
+    - model_results.png
+
+  evaluate:
+    cmd: python src/evaluate.py
+    deps:
+    - src/evaluate.py
+    - models/model.keras       # depends on train stage output
+    - params.yaml
+    params:
+    - data.train_split
+    - evaluate.metrics_path
+    metrics:
+    - metrics.json:
+        cache: false           # don't cache — always re-evaluate
+metrics:
+- dvclive/metrics.json
+plots:
+- dvclive/plots/metrics:
+    x: step

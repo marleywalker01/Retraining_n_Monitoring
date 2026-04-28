@@ -1,0 +1,58 @@
+schema: '2.0'
+stages:
+  train:
+    cmd: python src/model.py
+    deps:
+    - path: params.yaml
+      hash: md5
+      md5: 89388575b46d4f9cd78c6962d143741a
+      size: 169
+    - path: src/model.py
+      hash: md5
+      md5: 59f6b050b05a9123b14aa11b028c0901
+      size: 3081
+    params:
+      params.yaml:
+        data.random_seed: 42
+        data.train_split: 0.8
+        model.dense_units: 10
+        model.epochs: 100
+        model.learning_rate: 0.01
+    outs:
+    - path: dvclive/
+      hash: md5
+      md5: 1ec6981bee88b55bf464d11bd12240d8.dir
+      size: 23857
+      nfiles: 4
+    - path: model_results.png
+      hash: md5
+      md5: 1f2800e7c8622e01f8e43f40f5b676aa
+      size: 41688
+    - path: models/model.keras
+      hash: md5
+      md5: 14c0703ddd11b4e83f30a262b058becd
+      size: 18459
+  evaluate:
+    cmd: python src/evaluate.py
+    deps:
+    - path: models/model.keras
+      hash: md5
+      md5: 14c0703ddd11b4e83f30a262b058becd
+      size: 18459
+    - path: params.yaml
+      hash: md5
+      md5: 89388575b46d4f9cd78c6962d143741a
+      size: 169
+    - path: src/evaluate.py
+      hash: md5
+      md5: e8fbcc621876621f176d164bc8b67ac1
+      size: 1474
+    params:
+      params.yaml:
+        data.train_split: 0.8
+        evaluate.metrics_path: metrics.json
+    outs:
+    - path: metrics.json
+      hash: md5
+      md5: 52bd9858993a841870455c7bef736855
+      size: 42

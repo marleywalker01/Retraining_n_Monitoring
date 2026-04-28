@@ -16,7 +16,7 @@ stages:
         data.random_seed: 42
         data.train_split: 0.8
         model.dense_units: 10
-        model.epochs: 100
+        model.epochs: 10
         model.learning_rate: 0.01
     outs:
     - path: dvclive/

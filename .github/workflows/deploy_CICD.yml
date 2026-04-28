@@ -60,7 +60,9 @@ jobs:
         
       # ── Only pull input data, not model outputs ───────────────
       - name: Pull input data
-        run: dvc pull train/train.csv
+        run: 
+          dvc pull train/train.csv
+          dvc pull test/test.csv 
 
       # ── Override params from workflow_dispatch input ───────
       - name: Override epochs if provided

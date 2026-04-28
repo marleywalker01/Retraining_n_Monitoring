@@ -2,3 +2,4 @@
     remote = origin
 ['remote "origin"']
     url = https://dagshub.com/AfzalAChowdhary/deployment-data-COS40007.dvc
+    auth = basic

@@ -27,3 +27,10 @@ stages:
     metrics: # metrics to save and track with DVC
     - metrics.json:
         cache: false # don't store metrics.json in DVC cache since it's small and we want to overwrite it each time
+params:
+- dvclive/params.yaml
+metrics:
+- dvclive/metrics.json
+plots:
+- dvclive/plots/metrics:
+    x: step

@@ -6,14 +6,14 @@ data: # data-related parameters
 model: # model architecture and training parameters
   epochs: 10 # number of training epochs
   batch_size: 32           # number of samples per training batch
-  learning_rate: 0.001     # adam default, now explicit
+  learning_rate: 0.0001    # adam default, now explicit
   dense_units: 10          # kept for compatibility
 
   # CNN architecture parameters  
-  cnn_filters:             
-    - 64          # first conv layer filters
-    - 128         # second conv layer filters
-    - 64          # third conv layer filters
+  cnn_filters:
+  - 64
+  - 128
+  - 64
   kernel_size: 3   # convolution kernel size        
   pool_size: 2            # max pooling size
   dense_units_1: 256      # first dense layer units

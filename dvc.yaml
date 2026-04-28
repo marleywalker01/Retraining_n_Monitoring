@@ -12,7 +12,8 @@ stages:
     - artifacts/y_test.npy
     - artifacts/training_history.json
     - artifacts/feature_columns.json     
-    - dvclive/
+    - dvclive/params.yaml:
+        cache: false # don't store params.yaml in DVC cache since it's small and we want to overwrite it each time
 
   evaluate: # evaluate the model on test set and save metrics/plots
     cmd: python src/evaluate.py # evaluate the model and save metrics/plots

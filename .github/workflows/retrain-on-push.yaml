@@ -1,15 +1,15 @@
-name: Auto Retrain and Monitor
+name: Auto Retrain on New Data
 
 on:
   push:
     paths:
       - '.github/workflows/retrain-on-push.yaml'
-      - 'data/*.csv'
-      - 'train/*.csv'
-      - 'test/*.csv'
+      - 'data/*.csv'      # New data uploaded
+      - 'train/*.csv'     # Training data changed
+      - 'test/*.csv'      # Test data changed
   schedule:
-    - cron: '0 */12 * * *'
-  workflow_dispatch:
+    - cron: '0 */12 * * *'  # Run every 12 hours
+  workflow_dispatch:        # Manual trigger
 
 jobs:
   monitor-and-retrain:
@@ -40,80 +40,64 @@ jobs:
     - name: Pull latest data and models
       run: dvc pull --allow-missing || echo "No existing data to pull"
     
-    - name: Check for new data and preprocess
+    - name: Check for new data
       id: check_data
       run: |
         if [ -f "data/new_data.csv" ]; then
-          echo "[INFO] New data detected, preprocessing..."
-          python src/preprocess_new_data.py
+          echo "New data detected"
           echo "NEW_DATA=true" >> $GITHUB_ENV
           echo "new_data=true" >> $GITHUB_OUTPUT
         else
-          echo "[INFO] No new data found"
+          echo "No new data found"
           echo "NEW_DATA=false" >> $GITHUB_ENV
           echo "new_data=false" >> $GITHUB_OUTPUT
         fi
     
-    - name: Run comprehensive monitoring
-      id: monitoring
+    - name: Run monitoring (for logging only)
       run: |
-        python src/monitor.py
-        MONITOR_EXIT=$?
-        echo "Monitor exit code: $MONITOR_EXIT"
-        
-        if [ -f "retrain_needed.txt" ]; then
-          RETRAIN=$(cat retrain_needed.txt)
-          echo "retrain_needed=$RETRAIN" >> $GITHUB_OUTPUT
-          echo "RETRAIN_NEEDED=$RETRAIN" >> $GITHUB_ENV
-        else
-          if [ $MONITOR_EXIT -eq 1 ]; then
-            echo "retrain_needed=true" >> $GITHUB_OUTPUT
-            echo "RETRAIN_NEEDED=true" >> $GITHUB_ENV
-          else
-            echo "retrain_needed=false" >> $GITHUB_OUTPUT
-            echo "RETRAIN_NEEDED=false" >> $GITHUB_ENV
-          fi
-        fi
-        
-        echo "[INFO] Final retrain_needed: ${{ env.RETRAIN_NEEDED }}"
+        echo "Running monitoring to check current state..."
+        python src/monitor.py || echo "Monitoring completed with warnings"
     
-    - name: Retrain model
-      if: success() && (env.RETRAIN_NEEDED == 'true' || env.NEW_DATA == 'true')
+    - name: Retrain model (only if new data exists)
+      if: env.NEW_DATA == 'true'
       run: |
         echo "=========================================="
-        echo "RETRAINING MODEL"
+        echo "RETRAINING MODEL (New Data Detected)"
         echo "=========================================="
-        echo "NEW_DATA: ${{ env.NEW_DATA }}"
-        echo "RETRAIN_NEEDED: ${{ env.RETRAIN_NEEDED }}"
         
-        # Combine old and new data if new data exists
-        if [ -f "data/new_data.csv" ]; then
-          echo "Combining old and new data for retraining..."
-          python -c "
-          import pandas as pd
-          import os
+        # Combine old and new data
+        python -c "
+        import pandas as pd
+        import os
 
-          # Load existing training data
-          if os.path.exists('train/train.csv'):
-              train_df = pd.read_csv('train/train.csv')
-              print(f'Original training data: {len(train_df)} rows')
-              
-              # Load new data
-              new_df = pd.read_csv('data/new_data.csv')
-              print(f'New data: {len(new_df)} rows')
-              
-              # Combine
-              combined_df = pd.concat([train_df, new_df], ignore_index=True)
-              combined_df = combined_df.dropna()
-              print(f'Combined data: {len(combined_df)} rows')
-              
-              # Save combined data
-              combined_df.to_csv('train/train.csv', index=False)
-              print('Combined data saved to train/train.csv')
-        "
-        fi
+        # Load existing training data
+        if os.path.exists('train/train.csv'):
+            train_df = pd.read_csv('train/train.csv')
+            print(f'Original training data: {len(train_df)} rows')
+            
+            # Load new data
+            new_df = pd.read_csv('data/new_data.csv')
+            print(f'New data: {len(new_df)} rows')
+            
+            # Combine
+            combined_df = pd.concat([train_df, new_df], ignore_index=True)
+            combined_df = combined_df.dropna()
+            print(f'Combined data: {len(combined_df)} rows')
+            
+            # Save combined data
+            combined_df.to_csv('train/train.csv', index=False)
+            print('Combined data saved to train/train.csv')
+            
+            # Move new data to processed folder
+            os.makedirs('data/processed', exist_ok=True)
+            import shutil
+            from datetime import datetime
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            shutil.move('data/new_data.csv', f'data/processed/new_data_{timestamp}.csv')
+            print(f'New data moved to data/processed/new_data_{timestamp}.csv')
+        " 
         
-        # Force retrain the model
+        # Retrain the model
         echo ""
         echo "Starting model retraining..."
         python src/model.py
@@ -121,34 +105,27 @@ jobs:
         # Save retraining metadata
         mkdir -p artifacts/metadata
         echo "$(date)" > artifacts/metadata/last_retrain.txt
-        echo "${{ steps.monitoring.outputs.retrain_needed }}" > artifacts/metadata/retrain_triggered.txt
         
         echo ""
         echo "Retraining completed!"
     
     - name: Evaluate new model
-      if: success() && (env.RETRAIN_NEEDED == 'true' || env.NEW_DATA == 'true')
+      if: env.NEW_DATA == 'true'
       run: |
         echo "Evaluating new model..."
         python src/evaluate.py
     
-    - name: Verify improvement with monitoring
-      if: success() && (env.RETRAIN_NEEDED == 'true' || env.NEW_DATA == 'true')
-      run: |
-        echo "Re-running monitoring to verify improvement..."
-        python src/monitor.py || echo "Monitoring after retrain completed"
-    
-    - name: Push to DVC remote
-      if: success() && (env.RETRAIN_NEEDED == 'true' || env.NEW_DATA == 'true')
+    - name: Push new model and artifacts
+      if: env.NEW_DATA == 'true'
       run: |
         dvc push
     
-    - name: Commit and push changes to Git
-      if: success() && (env.RETRAIN_NEEDED == 'true' || env.NEW_DATA == 'true')
+    - name: Commit and push changes
+      if: env.NEW_DATA == 'true'
       run: |
         git config user.name "GitHub Actions"
-        git config user.email "actions@github.com"
-        git add artifacts/ models/ train/ test/ data/ || true
+        git config.user.email "actions@github.com"
+        git add artifacts/ models/ train/ data/processed/ || true
         git add *.dvc dvc.lock || true
         
         if git diff --staged --quiet; then
@@ -171,10 +148,10 @@ jobs:
         retention-days: 7
     
     - name: Send notification
-      if: success() && (env.RETRAIN_NEEDED == 'true' || env.NEW_DATA == 'true')
+      if: env.NEW_DATA == 'true'
       run: |
         echo "=========================================="
-        echo "AUTO-RETRAINING COMPLETED SUCCESSFULLY"
+        echo "AUTO-RETRAINING COMPLETED"
         echo "=========================================="
-        echo "Model has been retrained with new data"
+        echo "Model retrained with new data"
         echo "New model pushed to DVC and Git"

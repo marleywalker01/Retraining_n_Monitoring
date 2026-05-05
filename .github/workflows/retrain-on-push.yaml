@@ -1,20 +1,24 @@
-name: Auto Retrain on Data Push
+name: Auto Retrain and Monitor
 
 on:
   push:
     paths:
-      - 'data/*.csv'  # Trigger when new data is uploaded to data/ folder
-      - 'train/*.csv' # Or when train data changes
-      - 'test/*.csv'  # Or when test data changes
+      - 'data/*.csv'      # New data uploaded
+      - 'train/*.csv'     # Training data changed
+      - 'test/*.csv'      # Test data changed
+  schedule:
+    - cron: '0 */12 * * *'  # Run every 12 hours
+  workflow_dispatch:        # Manual trigger
 
 jobs:
-  retrain:
+  monitor-and-retrain:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v3
       with:
-        fetch-depth: 0  # Get all history for DVC
+        fetch-depth: 0
     
     - name: Setup Python
       uses: actions/setup-python@v4
@@ -23,41 +27,70 @@ jobs:
     
     - name: Install dependencies
       run: |
-        pip install dvc pandas numpy tensorflow scikit-learn evidently
+        pip install dvc pandas numpy tensorflow scikit-learn joblib scipy
     
     - name: Configure DVC remote
       run: |
-        dvc remote modify origin url ${{ secrets.DVC_REMOTE_URL }}
-        dvc remote modify origin --local access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
-        dvc remote modify origin --local secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        dvc remote modify origin auth basic
+          dvc remote modify origin user ${{ secrets.DAGSHUB_USERNAME }}
+          dvc remote modify origin password ${{ secrets.DAGSHUB_TOKEN }}
+          # name: Configure DVC remote
+          # env:
+          #   GDRIVE_CREDENTIALS_DATA: ${{ secrets.GDRIVE_CREDENTIALS_DATA }}
+          #   # OR for S3:
+          #   # AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          #   # AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          # run: |
+          #   dvc remote modify myremote gdrive_use_service_account true
+          #   # Adjust this block to match whichever remote you chose in Step 4
     
     - name: Pull latest data and models
       run: dvc pull --allow-missing
     
-    - name: Check for drift
-      id: drift
+    - name: Preprocess new data (if exists)
+      run: |
+        if [ -f "data/new_data.csv" ]; then
+          echo "New data detected, preprocessing..."
+          python src/preprocess_new_data.py
+        fi
+    
+    - name: Run comprehensive monitoring
+      id: monitoring
       run: |
         python src/monitor.py
-        echo "drift_detected=$(cat drift_status.txt)" >> $GITHUB_OUTPUT
+        echo "retrain_needed=$(cat retrain_needed.txt)" >> $GITHUB_OUTPUT
     
-    - name: Retrain model
-      if: success()
+    - name: Retrain model if needed
+      if: steps.monitoring.outputs.retrain_needed == 'true'
       run: |
-        dvc repro  # Runs train and evaluate stages
-    
-    - name: Send drift notification
-      if: steps.drift.outputs.drift_detected == 'true'
-      run: |
-        # Send email/slack/teams notification
-        curl -X POST -H 'Content-type: application/json' \
-        --data '{"text":"⚠️ Data drift detected! Model has been retrained."}' \
-        ${{ secrets.SLACK_WEBHOOK_URL }}
-    
-    - name: Push new model and data versions
-      run: |
+        echo "Retraining model..."
+        dvc repro
+        
+        # Update metadata
+        echo "$(date)" > artifacts/metadata/last_retrain.txt
+        git rev-parse HEAD > artifacts/metadata/model_version.txt
+        
+        # Push new model
         dvc push
+        
+        # Commit changes
         git config user.name "GitHub Actions"
         git config user.email "actions@github.com"
-        git add models/ artifacts/ train/ test/
-        git commit -m "Auto-retrain: New model from $(date +'%Y-%m-%d %H:%M:%S')" || echo "No changes to commit"
+        git add artifacts/ models/ train/ monitoring/reports/
+        git commit -m "Auto-retrain: Model updated $(date +'%Y-%m-%d %H:%M:%S')" || echo "No changes"
         git push
+    
+    - name: Upload monitoring reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: monitoring-reports
+        path: |
+          reports/
+          monitoring/
+          artifacts/metrics/
+    
+    - name: Send notification
+      if: steps.monitoring.outputs.retrain_needed == 'true'
+      run: |
+        echo "Model retrained due to drift/performance degradation"
+        # Add Slack/email webhook here

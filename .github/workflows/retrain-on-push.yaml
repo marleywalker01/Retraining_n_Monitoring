@@ -4,12 +4,12 @@ on:
   push:
     paths:
       - '.github/workflows/retrain-on-push.yaml'
-      - 'data/*.csv'      # New data uploaded
-      - 'train/*.csv'     # Training data changed
-      - 'test/*.csv'      # Test data changed
+      - 'data/*.csv'
+      - 'train/*.csv'
+      - 'test/*.csv'
   schedule:
-    - cron: '0 */12 * * *'  # Run every 12 hours
-  workflow_dispatch:        # Manual trigger
+    - cron: '0 */12 * * *'
+  workflow_dispatch:
 
 jobs:
   monitor-and-retrain:
@@ -29,7 +29,8 @@ jobs:
     
     - name: Install dependencies
       run: |
-        pip install dvc pandas numpy tensorflow scikit-learn joblib scipy matplotlib
+        pip install --upgrade pip
+        pip install dvc pandas numpy tensorflow scikit-learn joblib scipy matplotlib dvclive
     
     - name: Configure DVC remote
       run: |
@@ -69,6 +70,8 @@ jobs:
         python -c "
         import pandas as pd
         import os
+        import shutil
+        from datetime import datetime
 
         # Load existing training data
         if os.path.exists('train/train.csv'):
@@ -90,12 +93,10 @@ jobs:
             
             # Move new data to processed folder
             os.makedirs('data/processed', exist_ok=True)
-            import shutil
-            from datetime import datetime
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             shutil.move('data/new_data.csv', f'data/processed/new_data_{timestamp}.csv')
             print(f'New data moved to data/processed/new_data_{timestamp}.csv')
-        " 
+        "
         
         # Retrain the model
         echo ""
@@ -124,7 +125,7 @@ jobs:
       if: env.NEW_DATA == 'true'
       run: |
         git config user.name "GitHub Actions"
-        git config.user.email "actions@github.com"
+        git config user.email "actions@github.com"
         git add artifacts/ models/ train/ data/processed/ || true
         git add *.dvc dvc.lock || true
         

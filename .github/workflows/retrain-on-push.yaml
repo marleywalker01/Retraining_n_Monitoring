@@ -29,70 +29,114 @@ jobs:
     
     - name: Install dependencies
       run: |
-        pip install dvc pandas numpy tensorflow scikit-learn joblib scipy
+        pip install dvc pandas numpy tensorflow scikit-learn joblib scipy matplotlib
     
     - name: Configure DVC remote
       run: |
-        dvc remote modify origin auth basic
-        dvc remote modify origin user ${{ secrets.DAGSHUB_USERNAME }}
-        dvc remote modify origin password ${{ secrets.DAGSHUB_TOKEN }}
-        # name: Configure DVC remote
-        # env:
-        #   GDRIVE_CREDENTIALS_DATA: ${{ secrets.GDRIVE_CREDENTIALS_DATA }}
-        #   # OR for S3:
-        #   # AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        #   # AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        # run: |
-        #   dvc remote modify myremote gdrive_use_service_account true
-        #   # Adjust this block to match whichever remote you chose in Step 4 
+        dvc remote modify origin --local auth basic
+        dvc remote modify origin --local user ${{ secrets.DAGSHUB_USERNAME }}
+        dvc remote modify origin --local password ${{ secrets.DAGSHUB_TOKEN }}
     
     - name: Pull latest data and models
-      run: dvc pull --allow-missing
+      run: dvc pull --allow-missing || echo "No existing data to pull"
     
-    - name: Preprocess new data (if exists)
+    - name: Check for new data and preprocess
       run: |
         if [ -f "data/new_data.csv" ]; then
-          echo "New data detected, preprocessing..."
+          echo " New data detected, preprocessing..."
           python src/preprocess_new_data.py
+          echo "NEW_DATA=true" >> $GITHUB_ENV
+        else
+          echo " No new data found"
+          echo "NEW_DATA=false" >> $GITHUB_ENV
         fi
     
     - name: Run comprehensive monitoring
       id: monitoring
       run: |
         python src/monitor.py
-        echo "retrain_needed=$(cat retrain_needed.txt)" >> $GITHUB_OUTPUT
+        if [ -f "retrain_needed.txt" ]; then
+          RETRAIN=$(cat retrain_needed.txt)
+          echo "retrain_needed=$RETRAIN" >> $GITHUB_OUTPUT
+          echo "RETRAIN_NEEDED=$RETRAIN" >> $GITHUB_ENV
+        else
+          echo "retrain_needed=false" >> $GITHUB_OUTPUT
+          echo "RETRAIN_NEEDED=false" >> $GITHUB_ENV
+        fi
+      continue-on-error: false
     
-    - name: Retrain model if needed
-      if: steps.monitoring.outputs.retrain_needed == 'true'
+    - name: Retrain model
+      if: env.RETRAIN_NEEDED == 'true' || env.NEW_DATA == 'true'
       run: |
-        echo "Retraining model..."
-        dvc repro
+        echo " RETRAINING MODEL..."
+        echo "Reason: NEW_DATA=${{ env.NEW_DATA }}, RETRAIN_NEEDED=${{ env.RETRAIN_NEEDED }}"
         
-        # Update metadata
+        # Force retrain to ensure new data is included
+        dvc repro --force
+        
+        # Save training timestamp
         echo "$(date)" > artifacts/metadata/last_retrain.txt
         git rev-parse HEAD > artifacts/metadata/model_version.txt
         
-        # Push new model
+        # Save training metrics summary
+        echo "{
+          \"last_retrain\": \"$(date -Iseconds)\",
+          \"git_commit\": \"$(git rev-parse HEAD)\",
+          \"retrain_reason\": \"NEW_DATA=${{ env.NEW_DATA }}, DRIFT_DETECTED=${{ env.RETRAIN_NEEDED }}\"
+        }" > artifacts/metadata/retrain_info.json
+        
+        # Push new model and artifacts to DVC
         dvc push
         
-        # Commit changes
+      continue-on-error: false
+    
+    - name: Commit and push changes
+      if: env.RETRAIN_NEEDED == 'true' || env.NEW_DATA == 'true'
+      run: |
+        # Configure git
         git config user.name "GitHub Actions"
         git config user.email "actions@github.com"
-        git add artifacts/ models/ train/ monitoring/reports/
-        git commit -m "Auto-retrain: Model updated $(date +'%Y-%m-%d %H:%M:%S')" || echo "No changes"
-        git push
+        
+        # Add all changes
+        git add artifacts/ models/ train/ test/ data/ || true
+        git add *.dvc dvc.lock || true
+        
+        # Commit if there are changes
+        if git diff --staged --quiet; then
+          echo " No changes to commit"
+        else
+          git commit -m "Auto-retrain: Model updated with new data ($(date +'%Y-%m-%d %H:%M:%S'))"
+          git push
+        fi
     
     - name: Upload monitoring reports
       uses: actions/upload-artifact@v4
       with:
-        name: monitoring-reports
+        name: monitoring-reports-${{ github.run_id }}
         path: |
           reports/
           monitoring/
           artifacts/metrics/
+          artifacts/metadata/
+          model_results.png
+        retention-days: 7
     
-    - name: Send notification
-      if: steps.monitoring.outputs.retrain_needed == 'true'
+    - name: Send success notification
+      if: success() && (env.RETRAIN_NEEDED == 'true' || env.NEW_DATA == 'true')
       run: |
-        echo "Model retrained due to drift/performance degradation"
-        # Add Slack/email webhook here
+        echo " Auto-retraining completed successfully!"
+        echo "Model retrained and pushed to DVC remote"
+        # Uncomment for Slack notification
+        # curl -X POST -H 'Content-type: application/json' \
+        # --data '{"text":" Model auto-retrained successfully with new data"}' \
+        # ${{ secrets.SLACK_WEBHOOK_URL }}
+    
+    - name: Send failure notification
+      if: failure()
+      run: |
+        echo " Auto-retraining failed!"
+        echo "Check the workflow logs for details"
+        # Uncomment for Slack notification
+        # curl -X POST -H 'Content-type: application/json' \
+        # --data '{"text":" Auto-retraining failed! Check GitHub Actions logs"}' \
+        # ${{ secrets.SLACK_WEBHOOK_URL }}

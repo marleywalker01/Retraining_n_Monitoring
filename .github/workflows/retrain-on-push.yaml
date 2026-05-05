@@ -43,7 +43,7 @@ jobs:
         #   # AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         # run: |
         #   dvc remote modify myremote gdrive_use_service_account true
-        #   # Adjust this block to match whichever remote you chose in Step 4
+        #   # Adjust this block to match whichever remote you chose in Step 4 
     
     - name: Pull latest data and models
       run: dvc pull --allow-missing

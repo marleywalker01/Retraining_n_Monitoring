@@ -1,59 +1,45 @@
 """
-Preprocess new data for model prediction and retraining
+Standalone preprocessing for new data (no joblib dependency)
 """
 import os
 import sys
-import pandas as pd
-import numpy as np
 import json
-from utils import ArtifactManager, DataQualityMonitor, Notifier, setup_logging
+import numpy as np
+import pandas as pd
 
-# Setup logging
-logger = setup_logging('preprocessing')
+print("="*70)
+print("🔄 PREPROCESSING NEW DATA (Standalone)")
+print("="*70)
 
 def preprocess_new_data():
-    """Preprocess new data using saved artifacts from training"""
-    
-    logger.info("="*70)
-    logger.info("🔄 PREPROCESSING NEW DATA FOR RETRAINING")
-    logger.info("="*70)
-    
-    artifact_mgr = ArtifactManager()
+    """Preprocess new data without joblib"""
     
     # Check if new data exists
     new_data_path = 'data/new_data.csv'
     if not os.path.exists(new_data_path):
-        logger.warning("No new data found at data/new_data.csv")
+        print(" No new data found at data/new_data.csv")
         return False
     
     # Load new data
-    logger.info(f"Loading new data from {new_data_path}...")
+    print(f"\n Loading new data from {new_data_path}...")
     df = pd.read_csv(new_data_path)
-    logger.info(f"✅ Loaded {len(df)} rows with {df.shape[1]} columns")
+    print(f" Loaded {len(df)} rows with {df.shape[1]} columns")
     
-    # Data quality check
-    quality_report = DataQualityMonitor.generate_report(df, "new_data")
-    artifact_mgr.save_metrics(quality_report, 'data_quality_new.json')
+    # Load feature columns (JSON, not pickle)
+    feature_columns_path = 'artifacts/preprocessing/feature_columns.json'
+    if not os.path.exists(feature_columns_path):
+        # Try old location
+        feature_columns_path = 'artifacts/feature_columns.json'
+        if not os.path.exists(feature_columns_path):
+            print(f" Feature columns not found at {feature_columns_path}")
+            return False
     
-    if quality_report['missing_values']['total_missing'] > 0:
-        logger.warning(f"Found {quality_report['missing_values']['total_missing']} missing values")
-        
-        # Handle missing values
-        for col, count in quality_report['missing_values']['missing_by_column'].items():
-            if df[col].dtype in ['float64', 'int64']:
-                df[col].fillna(df[col].median(), inplace=True)
-                logger.info(f"  Filled {col} with median")
-            else:
-                df[col].fillna(df[col].mode()[0] if len(df[col].mode()) > 0 else 'unknown', inplace=True)
-                logger.info(f"  Filled {col} with mode")
+    with open(feature_columns_path, 'r') as f:
+        feature_columns = json.load(f)
+    print(f" Loaded {len(feature_columns)} feature columns")
     
-    # Load feature columns
-    logger.info("Loading feature columns from training...")
-    feature_columns = artifact_mgr.load_preprocessing('feature_columns.json')
-    logger.info(f"✅ Loaded {len(feature_columns)} feature columns")
-    
-    # Extract target
-    logger.info("Extracting target variable...")
+    # Extract target column
+    print("\n🎯 Processing data...")
     if 'target' in df.columns:
         y_new = df['target'].values
         X_df = df.drop('target', axis=1)
@@ -61,75 +47,130 @@ def preprocess_new_data():
         y_new = df['y'].values
         X_df = df.drop('y', axis=1)
     else:
+        # Assume last column is target
         y_new = df.iloc[:, -1].values
         X_df = df.iloc[:, :-1]
     
+    print(f" Target shape: {y_new.shape}")
+    
     # Match features
+    print("\n🔍 Matching features...")
     available_features = [col for col in feature_columns if col in X_df.columns]
     missing_features = [col for col in feature_columns if col not in X_df.columns]
     
-    logger.info(f"Available features: {len(available_features)}/{len(feature_columns)}")
-    
+    print(f" Available: {len(available_features)}/{len(feature_columns)}")
     if missing_features:
-        logger.warning(f"Missing {len(missing_features)} features, filling with 0")
+        print(f"⚠️ Missing {len(missing_features)} features, filling with 0")
         for col in missing_features:
             X_df[col] = 0
     
-    # Ensure correct order
+    # Ensure correct column order
     X_new = X_df[feature_columns].values
     
-    # Handle NaN
+    # Handle NaN values
     if np.isnan(X_new).any():
-        logger.warning(f"Found NaN in features, filling with 0")
+        print(f"⚠️ Found NaN in features, filling with 0")
         X_new = np.nan_to_num(X_new, nan=0.0)
     
-    # Apply scaler
-    logger.info("Applying scaler...")
-    if os.path.exists(f'{artifact_mgr.base_path}/preprocessing/scaler.pkl'):
-        scaler = artifact_mgr.load_preprocessing('scaler.pkl')
-        X_new_scaled = scaler.transform(X_new)
-        logger.info("✅ Scaler applied")
+    # Try to load scaler, but skip if corrupted
+    print("\n📊 Applying scaling...")
+    scaler_path = 'artifacts/preprocessing/scaler.pkl'
+    if os.path.exists(scaler_path):
+        try:
+            import joblib
+            scaler = joblib.load(scaler_path)
+            X_new_scaled = scaler.transform(X_new)
+            print(" Scaler applied")
+        except Exception as e:
+            print(f"⚠️ Could not load scaler: {e}")
+            print("⚠️ Using raw values without scaling")
+            X_new_scaled = X_new
     else:
+        print("⚠️ No scaler found, using raw values")
         X_new_scaled = X_new
-        logger.warning("No scaler found, using raw values")
     
-    # Reshape for CNN
-    logger.info("Reshaping for model...")
+    # Check if we need CNN reshape
+    print("\n🔄 Checking model format...")
     import tensorflow as tf
-    model = artifact_mgr.load_model()
-    expected_shape = model.input_shape
-    X_new_cnn = X_new_scaled.reshape(X_new_scaled.shape[0], X_new_scaled.shape[1], 1)
-    logger.info(f"✅ Reshaped to {X_new_cnn.shape}")
+    
+    if os.path.exists('models/model.keras'):
+        try:
+            model = tf.keras.models.load_model('models/model.keras', compile=False)
+            if len(model.input_shape) == 3:  # CNN expects (samples, features, 1)
+                X_new_cnn = X_new_scaled.reshape(X_new_scaled.shape[0], X_new_scaled.shape[1], 1)
+                print(f" Reshaped for CNN: {X_new_cnn.shape}")
+            else:
+                X_new_cnn = X_new_scaled
+                print(f" Using raw shape: {X_new_cnn.shape}")
+        except:
+            # Default to CNN format
+            X_new_cnn = X_new_scaled.reshape(X_new_scaled.shape[0], X_new_scaled.shape[1], 1)
+            print(f" Default reshape: {X_new_cnn.shape}")
+    else:
+        # Assume CNN format
+        X_new_cnn = X_new_scaled.reshape(X_new_scaled.shape[0], X_new_scaled.shape[1], 1)
+        print(f" Reshaped for CNN: {X_new_cnn.shape}")
     
     # Save preprocessed data
-    logger.info("Saving preprocessed data...")
-    artifact_mgr.save_data(X_new_cnn, 'X_new')
-    artifact_mgr.save_data(y_new, 'y_new')
-    logger.info(f"✅ Saved to artifacts/data/")
+    print("\n💾 Saving preprocessed data...")
+    os.makedirs('artifacts/data', exist_ok=True)
+    np.save('artifacts/data/X_new.npy', X_new_cnn)
+    np.save('artifacts/data/y_new.npy', y_new)
+    print(f" Saved to artifacts/data/X_new.npy (shape: {X_new_cnn.shape})")
+    print(f" Saved to artifacts/data/y_new.npy (shape: {y_new.shape})")
+    
+    # Also save to root for compatibility
+    np.save('artifacts/X_new_cnn.npy', X_new_cnn)
+    np.save('artifacts/y_new.npy', y_new)
+    print(f" Saved to artifacts/X_new_cnn.npy for compatibility")
     
     # Combine with training data for retraining
-    logger.info("Preparing combined dataset for retraining...")
+    print("\n🔄 Preparing combined dataset...")
     if os.path.exists('train/train.csv'):
         train_df = pd.read_csv('train/train.csv')
-        logger.info(f"Original training data: {len(train_df)} rows")
+        print(f" Original training: {len(train_df)} rows")
         
+        # Make sure new data has same columns as training data
+        for col in train_df.columns:
+            if col not in df.columns and col != 'y':
+                df[col] = 0
+        
+        # Ensure target column matches
+        if 'y' in train_df.columns and 'y' not in df.columns:
+            if 'target' in df.columns:
+                df['y'] = df['target']
+                df = df.drop('target', axis=1)
+        
+        # Combine
         combined_df = pd.concat([train_df, df], ignore_index=True)
         combined_df = combined_df.dropna()
-        logger.info(f"Combined dataset: {len(combined_df)} rows")
+        print(f" Combined: {len(combined_df)} rows")
         
+        # Save combined
         combined_df.to_csv('train/train_combined.csv', index=False)
         
-        # Backup original and replace
+        # Backup and replace
         import shutil
-        shutil.copy('train/train.csv', 'train/train_backup.csv')
+        if os.path.exists('train/train.csv'):
+            shutil.copy('train/train.csv', 'train/train_backup.csv')
         shutil.copy('train/train_combined.csv', 'train/train.csv')
-        logger.info("✅ Updated train/train.csv with new data")
+        print(f" Updated train/train.csv with new data")
     
-    logger.info("="*70)
-    logger.info("✅ New data preprocessing complete!")
+    print("\n" + "="*70)
+    print(" Preprocessing complete!")
+    print("="*70)
+    print("\nNext steps:")
+    print("   python src/monitor.py")
+    print("   dvc repro")
     
     return True
 
 if __name__ == "__main__":
-    success = preprocess_new_data()
-    sys.exit(0 if success else 1)
+    try:
+        success = preprocess_new_data()
+        sys.exit(0 if success else 1)
+    except Exception as e:
+        print(f"\n Error: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)

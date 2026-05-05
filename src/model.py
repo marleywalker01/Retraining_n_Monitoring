@@ -11,10 +11,12 @@ import json
 from datetime import datetime
 from io import StringIO
 import tensorflow as tf
-from tensorflow.keras.models import Sequential
+from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Dense, Dropout, Flatten, Conv1D, MaxPooling1D
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+import joblib
 from dvclive import Live
 
 # ── Load hyperparameters ───────────────────────────────────
@@ -42,6 +44,10 @@ LR_MIN        = params["callbacks"]["reduce_lr_min_lr"]
 # ── Directories ────────────────────────────────────────────
 artifacts_dir = "artifacts"
 os.makedirs(artifacts_dir, exist_ok=True)
+os.makedirs(f"{artifacts_dir}/preprocessing", exist_ok=True)
+os.makedirs(f"{artifacts_dir}/data", exist_ok=True)
+os.makedirs(f"{artifacts_dir}/metrics", exist_ok=True)
+os.makedirs(f"{artifacts_dir}/metadata", exist_ok=True)
 os.makedirs("models", exist_ok=True)
 
 print("=" * 50)
@@ -104,11 +110,22 @@ X = X.fillna(X.mean()).fillna(0).values
 y = data["y"].values
 print(f"X: {X.shape}  y: {y.shape}")
 
-# Save feature column names so evaluate.py can align test data exactly
+# ============================================
+#  Save feature column names (for monitor.py)
+# ============================================
 feature_columns = list(data.drop("y", axis=1).columns)
-with open("artifacts/feature_columns.json", "w", encoding='utf-8') as f:
+with open(f"{artifacts_dir}/preprocessing/feature_columns.json", "w", encoding='utf-8') as f:
     json.dump(feature_columns, f, indent=4)
-print(f"Saved: artifacts/feature_columns.json  ({len(feature_columns)} features)")
+print(f" Saved: {artifacts_dir}/preprocessing/feature_columns.json ({len(feature_columns)} features)")
+
+# Save original feature columns to root (backward compatibility)
+with open(f"{artifacts_dir}/feature_columns.json", "w", encoding='utf-8') as f:
+    json.dump(feature_columns, f, indent=4)
+print(f" Saved: {artifacts_dir}/feature_columns.json (backward compat)")
+
+# Save target column info
+with open(f"{artifacts_dir}/preprocessing/target_column.json", "w", encoding='utf-8') as f:
+    json.dump({"target_column": "y"}, f)
 
 # ── Train / test split ─────────────────────────────────────
 X_train, X_test, y_train, y_test = train_test_split(
@@ -116,17 +133,42 @@ X_train, X_test, y_train, y_test = train_test_split(
 )
 print(f"X_train: {X_train.shape}  X_test: {X_test.shape}")
 
+# ============================================
+#  Create and save scaler
+# ============================================
+print("\n📊 Creating and saving scaler...")
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+print(f" Features scaled: mean≈0, std≈1")
+
+# Save scaler
+joblib.dump(scaler, f"{artifacts_dir}/preprocessing/scaler.pkl")
+print(f" Saved scaler to {artifacts_dir}/preprocessing/scaler.pkl")
+
+# ============================================
+#  Save scaled data (as backup)
+# ============================================
+np.save(f"{artifacts_dir}/data/X_train_scaled.npy", X_train_scaled)
+np.save(f"{artifacts_dir}/data/X_test_scaled.npy", X_test_scaled)
+np.save(f"{artifacts_dir}/data/y_train.npy", y_train)
+np.save(f"{artifacts_dir}/data/y_test.npy", y_test)
+print(f" Saved scaled data to {artifacts_dir}/data/")
+
 # ── Reshape for 1D CNN: (samples, features, 1) ────────────
-X_train_cnn = X_train.reshape(X_train.shape[0], X_train.shape[1], 1)
-X_test_cnn  = X_test.reshape(X_test.shape[0],  X_test.shape[1],  1)
+X_train_cnn = X_train_scaled.reshape(X_train_scaled.shape[0], X_train_scaled.shape[1], 1)
+X_test_cnn  = X_test_scaled.reshape(X_test_scaled.shape[0], X_test_scaled.shape[1], 1)
 print(f"CNN shapes — train: {X_train_cnn.shape}  test: {X_test_cnn.shape}")
 
 # ── Save split data for evaluate.py ───────────────────────
 # evaluate.py loads these instead of re-splitting, ensuring
 # both scripts use the identical train/test partition.
-np.save("artifacts/X_test_cnn.npy",  X_test_cnn)
-np.save("artifacts/y_test.npy",      y_test)
-print("Saved: artifacts/X_test_cnn.npy  artifacts/y_test.npy")
+np.save(f"{artifacts_dir}/X_test_cnn.npy",  X_test_cnn)
+np.save(f"{artifacts_dir}/y_test.npy",      y_test)
+np.save(f"{artifacts_dir}/data/X_test_cnn.npy", X_test_cnn)
+np.save(f"{artifacts_dir}/data/X_train_cnn.npy", X_train_cnn)
+print(" Saved: artifacts/X_test_cnn.npy, artifacts/y_test.npy")
+print(" Saved: artifacts/data/X_test_cnn.npy, artifacts/data/X_train_cnn.npy")
 
 # ── Custom R2 metric ───────────────────────────────────────
 def r2_metric(y_true, y_pred):
@@ -214,8 +256,8 @@ print("Training completed!")
 # ── Save model ─────────────────────────────────────────────
 model.save("models/model.keras")
 model.save(f"{artifacts_dir}/cnn_regression_model.h5")
-print("Saved: models/model.keras")
-print(f"Saved: {artifacts_dir}/cnn_regression_model.h5")
+print(" Saved: models/model.keras")
+print(f" Saved: {artifacts_dir}/cnn_regression_model.h5")
 
 # ── Training history plots ─────────────────────────────────
 fig, axes = plt.subplots(1, 2, figsize=(15, 5))
@@ -241,7 +283,8 @@ plt.tight_layout()
 plt.savefig('model_results.png',                  dpi=300, bbox_inches='tight')
 plt.savefig(f'{artifacts_dir}/model_results.png', dpi=300, bbox_inches='tight')
 plt.close()
-print("Saved: model_results.png")
+print(" Saved: model_results.png")
+print(f" Saved: {artifacts_dir}/model_results.png")
 
 # ── Save training history for evaluate.py ─────────────────
 history_dict = {
@@ -254,9 +297,31 @@ if 'r2_metric' in history.history:
     history_dict["r2_metric"]     = [float(v) for v in history.history['r2_metric']]
     history_dict["val_r2_metric"] = [float(v) for v in history.history['val_r2_metric']]
 
-with open("artifacts/training_history.json", "w", encoding='utf-8') as f:
+with open(f"{artifacts_dir}/training_history.json", "w", encoding='utf-8') as f:
     json.dump(history_dict, f, indent=4)
-print("Saved: artifacts/training_history.json")
+with open(f"{artifacts_dir}/metrics/training_history.json", "w", encoding='utf-8') as f:
+    json.dump(history_dict, f, indent=4)
+print(" Saved: artifacts/training_history.json")
+print(" Saved: artifacts/metrics/training_history.json")
+
+# ============================================
+#  Save test metrics
+# ============================================
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+
+# Get predictions on test set
+y_pred = model.predict(X_test_cnn, verbose=0).flatten()
+
+test_metrics = {
+    'mse': float(mean_squared_error(y_test, y_pred)),
+    'mae': float(mean_absolute_error(y_test, y_pred)),
+    'r2': float(r2_score(y_test, y_pred)),
+    'timestamp': datetime.now().isoformat()
+}
+
+with open(f"{artifacts_dir}/metrics/test_metrics.json", "w", encoding='utf-8') as f:
+    json.dump(test_metrics, f, indent=4)
+print(" Saved: artifacts/metrics/test_metrics.json")
 
 # ── Save data info ─────────────────────────────────────────
 data_info = {
@@ -272,6 +337,75 @@ data_info = {
 }
 with open('data_info.json', 'w', encoding='utf-8') as f:
     json.dump(data_info, f, indent=4)
-print("Saved: data_info.json")
+with open(f"{artifacts_dir}/metadata/data_info.json", 'w', encoding='utf-8') as f:
+    json.dump(data_info, f, indent=4)
+print(" Saved: data_info.json")
+print(" Saved: artifacts/metadata/data_info.json")
 
-print("\nmodel.py complete — run evaluate.py next")
+# ============================================
+#  Save model metadata
+# ============================================
+model_metadata = {
+    'model_type': 'CNN_Regression',
+    'input_shape': X_train_cnn.shape[1:],
+    'num_features': len(feature_columns),
+    'num_training_samples': len(y_train),
+    'num_test_samples': len(y_test),
+    'feature_columns_preview': feature_columns[:10],  # First 10 for preview
+    'target_column': 'y',
+    'training_completed': datetime.now().isoformat(),
+    'hyperparameters': {
+        'epochs': EPOCHS,
+        'batch_size': BATCH_SIZE,
+        'learning_rate': LEARNING_RATE,
+        'cnn_filters': CNN_FILTERS,
+        'kernel_size': KERNEL_SIZE,
+        'pool_size': POOL_SIZE,
+        'dense_units': [DENSE_1, DENSE_2, DENSE_3],
+        'dropout_rates': [DROPOUT_1, DROPOUT_2]
+    },
+    'test_performance': test_metrics
+}
+
+with open(f"{artifacts_dir}/metadata/model_info.json", "w", encoding='utf-8') as f:
+    json.dump(model_metadata, f, indent=4)
+print(" Saved: artifacts/metadata/model_info.json")
+
+# Save number of features as text file for easy reading
+with open(f"{artifacts_dir}/metadata/num_features.txt", "w") as f:
+    f.write(str(len(feature_columns)))
+
+# ============================================
+# FINAL SUMMARY
+# ============================================
+print("\n" + "="*60)
+print(" TRAINING COMPLETE - ALL ARTIFACTS GENERATED")
+print("="*60)
+print("\n Generated artifacts structure:")
+print("   artifacts/preprocessing/")
+print("   ├── feature_columns.json")
+print("   ├── scaler.pkl")
+print("   └── target_column.json")
+print("   artifacts/data/")
+print("   ├── X_train_scaled.npy")
+print("   ├── X_test_scaled.npy")
+print("   ├── X_train_cnn.npy")
+print("   ├── X_test_cnn.npy")
+print("   ├── y_train.npy")
+print("   └── y_test.npy")
+print("   artifacts/metrics/")
+print("   ├── test_metrics.json")
+print("   └── training_history.json")
+print("   artifacts/metadata/")
+print("   ├── data_info.json")
+print("   ├── model_info.json")
+print("   └── num_features.txt")
+print("   models/model.keras")
+print("\n Next steps:")
+print("   1. Run: dvc add artifacts/ models/")
+print("   2. Run: dvc push")
+print("   3. python src/preprocess_new_data.py")
+print("   4. python src/monitor.py")
+print("="*60)
+
+print("\n model.py completed successfully! Ready for monitoring and retraining.")

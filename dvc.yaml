@@ -1,18 +1,4 @@
 stages:
-  train:
-    cmd: python src/model.py # train the model and save outputs
-    deps: # dependencies for this stage
-    - src/model.py
-    - params.yaml
-    - train/train.csv
-    - test/test.csv
-    outs: # outputs of this stage (saved to DVC cache and remote)
-    - models/model.keras
-    - artifacts/X_test_cnn.npy
-    - artifacts/y_test.npy
-    - artifacts/training_history.json
-    - artifacts/feature_columns.json
-
   evaluate: # evaluate the model on test set and save metrics/plots
     cmd: python src/evaluate.py # evaluate the model and save metrics/plots
     deps: # dependencies for this stage

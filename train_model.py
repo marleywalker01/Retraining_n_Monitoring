@@ -1,95 +1,110 @@
+import os
+import sys
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import joblib
+import yaml
 import json
-import os
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, Dropout
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import classification_report
-from sklearn import metrics
+from datetime import datetime
 
-os.makedirs('models', exist_ok=True)
-os.makedirs('artifacts', exist_ok=True)
+import tensorflow as tf
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 
-# Load Data
-df = pd.read_csv('train/train.csv')
-X = df.iloc[:, :-1].values
-y = df.iloc[:, -1].values
-feature_columns = list(df.columns[:-1])
+# Load hyperparameters
+with open("params.yaml") as f:
+    params = yaml.safe_load(f)
 
-# Save feature columns
-with open('artifacts/feature_columns.json', 'w') as f:
-    json.dump(feature_columns, f)
-print("Feature columns saved!")
+TEST_SIZE    = params["data"]["test_size"]
+BATCH_SIZE   = params["model"]["batch_size"]
+EPOCHS       = params["model"]["epochs"]
+METRICS_PATH = params["evaluate"]["metrics_path"]
 
-# Preprocessing
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-scaler = StandardScaler()
-X_train = scaler.fit_transform(X_train)
-X_test = scaler.transform(X_test)
+artifacts_dir = "artifacts"
 
-# Save scaler and test data
-joblib.dump(scaler, 'artifacts/scaler.joblib')
-np.save('artifacts/X_test_cnn.npy', X_test)
-np.save('artifacts/y_test.npy', y_test)
-print("Test data and scaler saved!")
+# Check required files exist
+for path in ["artifacts/X_test_cnn.npy", "artifacts/y_test.npy",
+             "artifacts/training_history.json", "models/model.keras"]:
+    if not os.path.exists(path):
+        print(f"ERROR: {path} not found — run model.py first")
+        sys.exit(1)
 
-# Build Model
-model = Sequential([
-    Dense(64, activation='relu', input_shape=(X_train.shape[1],)),
-    Dropout(0.2),
-    Dense(32, activation='relu'),
-    Dropout(0.2),
-    Dense(16, activation='relu'),
-    Dense(7, activation='softmax')
-])
-model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-history = model.fit(X_train, y_train, epochs=40, batch_size=16, validation_data=(X_test, y_test))
+print("Loading test data and model...")
+X_test = np.load("artifacts/X_test_cnn.npy")
+y_test = np.load("artifacts/y_test.npy")
+print(f"X_test: {X_test.shape}  y_test: {y_test.shape}")
 
-# Save model as .keras
-model.save('models/model.keras')
-print("Model saved as models/model.keras!")
+with open("artifacts/training_history.json") as f:
+    history_dict = json.load(f)
 
-# Save training history
-history_dict = {
-    'loss': history.history['loss'],
-    'val_loss': history.history['val_loss'],
-    'accuracy': history.history['accuracy'],
-    'val_accuracy': history.history['val_accuracy']
-}
-with open('artifacts/training_history.json', 'w') as f:
-    json.dump(history_dict, f)
-print("Training history saved!")
+# Load model
+model = tf.keras.models.load_model("models/model.keras")
+print("Model loaded successfully")
 
 # Evaluate
-loss, accuracy = model.evaluate(X_test, y_test)
-print(f"Accuracy: {accuracy}")
-print(f"Loss: {loss}")
+score = model.evaluate(X_test, y_test, verbose=0)
+print(f"\nTest Loss: {score[0]:.4f}")
+print(f"Test Accuracy: {score[1]:.4f}")
 
-# Plot
+# Predictions
+preds_prob = model.predict(X_test, verbose=0)
+preds = np.argmax(preds_prob, axis=1)
+
+# Metrics
+acc = accuracy_score(y_test, preds)
+print(f"\nAccuracy: {acc:.4f}")
+print(f"\nClassification Report:\n{classification_report(y_test, preds)}")
+print(f"\nConfusion Matrix:\n{confusion_matrix(y_test, preds)}")
+
+# Plot training curves
 plt.figure(figsize=(12,4))
 plt.subplot(1,2,1)
-plt.plot(history.history['accuracy'], label="Train Accuracy")
-plt.plot(history.history['val_accuracy'], label="Validation Accuracy")
+plt.plot(history_dict['accuracy'], label="Train Accuracy")
+plt.plot(history_dict['val_accuracy'], label="Val Accuracy")
 plt.xlabel('Epoch')
 plt.ylabel('Accuracy')
 plt.legend()
 plt.subplot(1,2,2)
-plt.plot(history.history['loss'], label="Train Loss")
-plt.plot(history.history['val_loss'], label="Validation Loss")
+plt.plot(history_dict['loss'], label="Train Loss")
+plt.plot(history_dict['val_loss'], label="Val Loss")
 plt.xlabel('Epoch')
 plt.ylabel('Loss')
 plt.legend()
 plt.tight_layout()
-plt.savefig('artifacts/training_curves.png')
-plt.show()
+plt.savefig(f'{artifacts_dir}/training_curves.png', dpi=300, bbox_inches='tight')
+plt.close()
+print("Saved: training_curves.png")
 
-# Predictions
-predictions = model.predict(X_test)
-y_pred = np.argmax(predictions, axis=1)
-print(f"Classification Report:\n {classification_report(y_test, y_pred)}")
-print("\nConfusion Matrix:\n", metrics.confusion_matrix(y_test, y_pred))
+# Save metrics.json
+metrics_out = {
+    "timestamp":  datetime.now().isoformat(),
+    "model_type": "ANN Classifier",
+    "test_size":  TEST_SIZE,
+    "batch_size": BATCH_SIZE,
+    "epochs":     EPOCHS,
+    "metrics": {
+        "accuracy": float(acc),
+        "loss":     float(score[0])
+    },
+    "training_history": {
+        "final_train_loss":     float(history_dict['loss'][-1]),
+        "final_val_loss":       float(history_dict['val_loss'][-1]),
+        "final_train_accuracy": float(history_dict['accuracy'][-1]),
+        "final_val_accuracy":   float(history_dict['val_accuracy'][-1])
+    }
+}
 
+with open(METRICS_PATH, 'w', encoding='utf-8') as f:
+    json.dump(metrics_out, f, indent=4)
+print(f"Saved: {METRICS_PATH}")
+
+# Save metrics.txt
+with open('metrics.txt', 'w') as f:
+    f.write("=" * 50 + "\n")
+    f.write("MODEL PERFORMANCE METRICS\n")
+    f.write("=" * 50 + "\n")
+    f.write(f"Accuracy: {acc:.4f}\n")
+    f.write(f"Loss:     {score[0]:.4f}\n")
+    f.write("=" * 50 + "\n")
+print("Saved: metrics.txt")

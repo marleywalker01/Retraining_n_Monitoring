@@ -1,0 +1,5 @@
+outs:
+- md5: 3cdf8c7aa63c3e2bc8be74421b0de941
+  size: 45480
+  hash: md5
+  path: training_curves.png

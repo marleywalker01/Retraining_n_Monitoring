@@ -1,0 +1,5 @@
+outs:
+- md5: 30917fd9752bda4fb3cb53b591a325b9
+  size: 54272
+  hash: md5
+  path: X_test_cnn.npy

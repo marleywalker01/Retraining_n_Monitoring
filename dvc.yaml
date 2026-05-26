@@ -1,4 +1,16 @@
 stages:
+  preprocess: # preprocess new data before retraining
+    cmd: python src/preprocess_new_data.py # preprocess new data and update train.csv
+    deps: # dependencies for this stage
+      - src/preprocess_new_data.py
+      - data/new_data.csv
+      - artifacts/feature_columns.json
+    outs:
+      - artifacts/data/X_new.npy:
+          cache: false
+      - artifacts/data/y_new.npy:
+          cache: false
+
   train: # train the model and save artifacts
     cmd: python src/model.py # train the model and save artifacts
     deps: # dependencies for this stage

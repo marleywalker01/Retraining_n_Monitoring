@@ -109,10 +109,10 @@ jobs:
             print(f'New data moved to data/processed/new_data_{timestamp}.csv')
         "
         
-        # Retrain the model
+        # Retrain the model via DVC pipeline
         echo ""
         echo "Starting model retraining..."
-        python src/model.py
+        dvc repro train
         
         # Save retraining metadata
         mkdir -p artifacts/metadata

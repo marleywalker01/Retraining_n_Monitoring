@@ -59,6 +59,12 @@ jobs:
           echo "new_data=false" >> $GITHUB_OUTPUT
         fi
     
+    - name: Preprocess new data
+      if: env.NEW_DATA == 'true'
+      run: |
+        echo "Preprocessing new data..."
+        python src/preprocess_new_data.py
+
     - name: Run monitoring (for logging only)
       run: |
         echo "Running monitoring to check current state..."

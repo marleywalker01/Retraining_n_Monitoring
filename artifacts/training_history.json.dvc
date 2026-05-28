@@ -1,5 +1,0 @@
-outs:
-- md5: 13500745ffd1ff3cacc5f8ad72c6c9fb
-  size: 3272
-  hash: md5
-  path: training_history.json

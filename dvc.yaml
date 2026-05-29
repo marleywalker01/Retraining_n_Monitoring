@@ -22,7 +22,6 @@ stages:
       - artifacts/X_test_cnn.npy
       - artifacts/y_test.npy
       - artifacts/training_history.json
-      - artifacts/feature_columns.json
 
   evaluate: # evaluate the model on test set and save metrics/plots
     cmd: python src/evaluate.py # evaluate the model and save metrics/plots

@@ -172,6 +172,7 @@ print(" Saved: artifacts/data/X_test_cnn.npy, artifacts/data/X_train_cnn.npy")
 
 # ── Custom R2 metric ───────────────────────────────────────
 def r2_metric(y_true, y_pred):
+    y_true = tf.cast(y_true, tf.float32)
     SS_res = tf.reduce_sum(tf.square(y_true - y_pred))
     SS_tot = tf.reduce_sum(tf.square(y_true - tf.reduce_mean(y_true)))
     return 1 - SS_res / (SS_tot + tf.keras.backend.epsilon())

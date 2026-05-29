@@ -1,4 +1,4 @@
-Age,Height,Weight,FCVC,NCP,CH2O,FAF,TUE,NObeyesdad_encoded,CAEC_encoded,CALC_encoded,Gender_encoded,family_history_with_overweight_encoded,FAVC_encoded,SMOKE_encoded,SCC_encoded,MTRANS_encoded
+Age,Height,Weight,FCVC,NCP,CH2O,FAF,TUE,y,CAEC_encoded,CALC_encoded,Gender_encoded,family_history_with_overweight_encoded,FAVC_encoded,SMOKE_encoded,SCC_encoded,MTRANS_encoded
 20.406871,1.755978,53.699561,2.0,3.891994,1.86393,2.870127,2.0,0,2,0,0,1,1,0,0,3
 26.0,1.62495,111.00492,3.0,3.0,2.704315,0.0,0.322666,6,1,1,0,1,1,0,0,3
 18.0,1.85,60.0,3.0,4.0,2.0,2.0,0.0,0,1,1,1,1,1,0,1,0

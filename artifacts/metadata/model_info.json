@@ -5,8 +5,8 @@
         1
     ],
     "num_features": 16,
-    "num_training_samples": 37037,
-    "num_test_samples": 15874,
+    "num_training_samples": 37317,
+    "num_test_samples": 15994,
     "feature_columns_preview": [
         "Age",
         "Height",
@@ -20,7 +20,7 @@
         "CALC_encoded"
     ],
     "target_column": "y",
-    "training_completed": "2026-05-29T20:17:04.414400",
+    "training_completed": "2026-05-29T20:19:43.008374",
     "hyperparameters": {
         "epochs": 10,
         "batch_size": 32,
@@ -43,9 +43,9 @@
         ]
     },
     "test_performance": {
-        "mse": 0.016246890649199486,
-        "mae": 0.0779171735048294,
-        "r2": 0.9960798621177673,
-        "timestamp": "2026-05-29T20:17:04.413529"
+        "mse": 0.009694736450910568,
+        "mae": 0.05872664973139763,
+        "r2": 0.9976645112037659,
+        "timestamp": "2026-05-29T20:19:43.007516"
     }
 }

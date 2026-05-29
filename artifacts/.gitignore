@@ -1,3 +1,6 @@
 /scaler.joblib
 /training_curves.png
 /feature_columns.json
+/X_test_cnn.npy
+/y_test.npy
+/training_history.json

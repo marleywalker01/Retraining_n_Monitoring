@@ -2,6 +2,9 @@ name: Auto Retrain on New Data
 
 on:
   push:
+    branches:
+      - main
+      - classification-fix
     paths:
       - '.github/workflows/retrain-on-push.yaml'
       - 'data/*.csv'

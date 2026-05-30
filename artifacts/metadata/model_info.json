@@ -1,12 +1,13 @@
 {
-    "model_type": "CNN_Regression",
+    "model_type": "CNN_Classification",
     "input_shape": [
         16,
         1
     ],
     "num_features": 16,
-    "num_training_samples": 125517,
-    "num_test_samples": 53794,
+    "num_classes": 7,
+    "num_training_samples": 125797,
+    "num_test_samples": 53914,
     "feature_columns_preview": [
         "Age",
         "Height",
@@ -20,7 +21,7 @@
         "CALC_encoded"
     ],
     "target_column": "y",
-    "training_completed": "2026-05-30T17:51:17.996665",
+    "training_completed": "2026-05-30T18:27:23.503190",
     "hyperparameters": {
         "epochs": 10,
         "batch_size": 32,
@@ -43,9 +44,7 @@
         ]
     },
     "test_performance": {
-        "mse": 0.0017940638354048133,
-        "mae": 0.019225899130105972,
-        "r2": 0.9995690584182739,
-        "timestamp": "2026-05-30T17:51:17.995447"
+        "accuracy": 0.9988685684608821,
+        "timestamp": "2026-05-30T18:27:23.496520"
     }
 }

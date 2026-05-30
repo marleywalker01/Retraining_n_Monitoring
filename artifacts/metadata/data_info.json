@@ -1,11 +1,11 @@
 {
-    "train_samples": 97797,
-    "test_samples": 41914,
+    "train_samples": 98077,
+    "test_samples": 42034,
     "features_count": 16,
     "categorical_vars_original": 0,
     "constant_features_dropped": 0,
-    "target_mean": 3.001696358912326,
-    "target_std": 2.0436585157509963,
+    "target_mean": 3.0016915160123046,
+    "target_std": 2.043660934379199,
     "target_min": 0.0,
     "target_max": 6.0
 }

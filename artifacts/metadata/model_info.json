@@ -1,0 +1,51 @@
+{
+    "model_type": "CNN_Regression",
+    "input_shape": [
+        16,
+        1
+    ],
+    "num_features": 16,
+    "num_training_samples": 110397,
+    "num_test_samples": 47314,
+    "feature_columns_preview": [
+        "Age",
+        "Height",
+        "Weight",
+        "FCVC",
+        "NCP",
+        "CH2O",
+        "FAF",
+        "TUE",
+        "CAEC_encoded",
+        "CALC_encoded"
+    ],
+    "target_column": "y",
+    "training_completed": "2026-05-30T12:14:46.780407",
+    "hyperparameters": {
+        "epochs": 10,
+        "batch_size": 32,
+        "learning_rate": 0.0001,
+        "cnn_filters": [
+            64,
+            128,
+            64
+        ],
+        "kernel_size": 3,
+        "pool_size": 2,
+        "dense_units": [
+            256,
+            128,
+            64
+        ],
+        "dropout_rates": [
+            0.3,
+            0.2
+        ]
+    },
+    "test_performance": {
+        "mse": 0.0032626872416585684,
+        "mae": 0.03426976129412651,
+        "r2": 0.9992179274559021,
+        "timestamp": "2026-05-30T12:14:46.779288"
+    }
+}

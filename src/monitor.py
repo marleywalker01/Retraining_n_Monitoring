@@ -1,7 +1,3 @@
-"""
-Comprehensive monitoring: drift, performance, data quality
-Windows-compatible version (no emojis)
-"""
 import os
 import sys
 import json

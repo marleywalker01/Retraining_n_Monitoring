@@ -1,20 +1,20 @@
 {
-    "timestamp": "2026-05-30T14:55:12.776406",
+    "timestamp": "2026-05-30T15:00:07.104483",
     "model_type": "1D CNN",
     "test_size": 0.3,
     "batch_size": 32,
     "epochs": 10,
     "final_epoch": 10,
     "metrics": {
-        "mean_squared_error": 0.005031803157180548,
-        "root_mean_squared_error": 0.07093520393415774,
-        "mean_absolute_error": 0.04353099688887596,
-        "r2_score": 0.9987941384315491
+        "mean_squared_error": 0.0021929433569312096,
+        "root_mean_squared_error": 0.046828873111908316,
+        "mean_absolute_error": 0.022076202556490898,
+        "r2_score": 0.9994726777076721
     },
     "training_history": {
-        "final_train_loss": 0.0078092170879244804,
-        "final_val_loss": 0.005031801760196686,
-        "final_train_r2": -62.926483154296875,
-        "final_val_r2": -62.0042839050293
+        "final_train_loss": 0.010493112727999687,
+        "final_val_loss": 0.002192940330132842,
+        "final_train_r2": -62.9188232421875,
+        "final_val_r2": -63.33029556274414
     }
 }

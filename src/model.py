@@ -16,6 +16,7 @@ from tensorflow.keras.layers import Dense, Dropout, Flatten, Conv1D, MaxPooling1
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import accuracy_score
 import joblib
 from dvclive import Live
 
@@ -51,7 +52,7 @@ os.makedirs(f"{artifacts_dir}/metadata", exist_ok=True)
 os.makedirs("models", exist_ok=True)
 
 print("=" * 50)
-print("STARTING CNN REGRESSION MODEL — TRAINING")
+print("STARTING CNN CLASSIFICATION MODEL — TRAINING")
 print("=" * 50)
 
 # ── Load data ──────────────────────────────────────────────
@@ -136,7 +137,7 @@ print(f"X_train: {X_train.shape}  X_test: {X_test.shape}")
 # ============================================
 #  Create and save scaler
 # ============================================
-print("\n📊 Creating and saving scaler...")
+print("\n Creating and saving scaler...")
 scaler = StandardScaler()
 X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
@@ -161,21 +162,12 @@ X_test_cnn  = X_test_scaled.reshape(X_test_scaled.shape[0], X_test_scaled.shape[
 print(f"CNN shapes — train: {X_train_cnn.shape}  test: {X_test_cnn.shape}")
 
 # ── Save split data for evaluate.py ───────────────────────
-# evaluate.py loads these instead of re-splitting, ensuring
-# both scripts use the identical train/test partition.
 np.save(f"{artifacts_dir}/X_test_cnn.npy",  X_test_cnn)
 np.save(f"{artifacts_dir}/y_test.npy",      y_test)
 np.save(f"{artifacts_dir}/data/X_test_cnn.npy", X_test_cnn)
 np.save(f"{artifacts_dir}/data/X_train_cnn.npy", X_train_cnn)
 print(" Saved: artifacts/X_test_cnn.npy, artifacts/y_test.npy")
 print(" Saved: artifacts/data/X_test_cnn.npy, artifacts/data/X_train_cnn.npy")
-
-# ── Custom R2 metric ───────────────────────────────────────
-def r2_metric(y_true, y_pred):
-    y_true = tf.cast(y_true, tf.float32)
-    SS_res = tf.reduce_sum(tf.square(y_true - y_pred))
-    SS_tot = tf.reduce_sum(tf.square(y_true - tf.reduce_mean(y_true)))
-    return 1 - SS_res / (SS_tot + tf.keras.backend.epsilon())
 
 # ── Build model ────────────────────────────────────────────
 tf.random.set_seed(SEED)
@@ -197,13 +189,13 @@ model = Sequential([
     Dense(DENSE_2, activation='relu'),
     Dropout(DROPOUT_2),
     Dense(DENSE_3, activation='relu'),
-    Dense(1, activation='linear')
+    Dense(7, activation='softmax')
 ])
 
 model.compile(
-    loss='mean_squared_error',
+    loss='sparse_categorical_crossentropy',
     optimizer=tf.keras.optimizers.Adam(learning_rate=LEARNING_RATE),
-    metrics=['mae', r2_metric]
+    metrics=['accuracy']
 )
 
 model.summary()
@@ -243,22 +235,19 @@ with Live(dir="dvclive", report="html") as live:
     )
 
     for i in range(len(history.history['loss'])):
-        live.log_metric("train_loss", history.history['loss'][i])
-        live.log_metric("val_loss",   history.history['val_loss'][i])
-        live.log_metric("train_mae",  history.history['mae'][i])
-        live.log_metric("val_mae",    history.history['val_mae'][i])
-        if 'r2_metric' in history.history:
-            live.log_metric("train_r2", history.history['r2_metric'][i])
-            live.log_metric("val_r2",   history.history['val_r2_metric'][i])
+        live.log_metric("train_loss",     history.history['loss'][i])
+        live.log_metric("val_loss",       history.history['val_loss'][i])
+        live.log_metric("train_accuracy", history.history['accuracy'][i])
+        live.log_metric("val_accuracy",   history.history['val_accuracy'][i])
         live.next_step()
 
 print("Training completed!")
 
 # ── Save model ─────────────────────────────────────────────
 model.save("models/model.keras")
-model.save(f"{artifacts_dir}/cnn_regression_model.h5")
+model.save(f"{artifacts_dir}/cnn_classification_model.h5")
 print(" Saved: models/model.keras")
-print(f" Saved: {artifacts_dir}/cnn_regression_model.h5")
+print(f" Saved: {artifacts_dir}/cnn_classification_model.h5")
 
 # ── Training history plots ─────────────────────────────────
 fig, axes = plt.subplots(1, 2, figsize=(15, 5))
@@ -267,18 +256,17 @@ axes[0].plot(history.history['loss'],     label='Train Loss')
 axes[0].plot(history.history['val_loss'], label='Val Loss')
 axes[0].set_title('Model Loss')
 axes[0].set_xlabel('Epoch')
-axes[0].set_ylabel('Loss (MSE)')
+axes[0].set_ylabel('Loss')
 axes[0].legend()
 axes[0].grid(True)
 
-if 'r2_metric' in history.history:
-    axes[1].plot(history.history['r2_metric'],     label='Train R2')
-    axes[1].plot(history.history['val_r2_metric'], label='Val R2')
-    axes[1].set_title('Model R2 Score')
-    axes[1].set_xlabel('Epoch')
-    axes[1].set_ylabel('R2')
-    axes[1].legend()
-    axes[1].grid(True)
+axes[1].plot(history.history['accuracy'],     label='Train Accuracy')
+axes[1].plot(history.history['val_accuracy'], label='Val Accuracy')
+axes[1].set_title('Model Accuracy')
+axes[1].set_xlabel('Epoch')
+axes[1].set_ylabel('Accuracy')
+axes[1].legend()
+axes[1].grid(True)
 
 plt.tight_layout()
 plt.savefig('model_results.png',                  dpi=300, bbox_inches='tight')
@@ -289,14 +277,11 @@ print(f" Saved: {artifacts_dir}/model_results.png")
 
 # ── Save training history for evaluate.py ─────────────────
 history_dict = {
-    "loss":     [float(v) for v in history.history['loss']],
-    "val_loss": [float(v) for v in history.history['val_loss']],
-    "mae":      [float(v) for v in history.history['mae']],
-    "val_mae":  [float(v) for v in history.history['val_mae']],
+    "loss":         [float(v) for v in history.history['loss']],
+    "val_loss":     [float(v) for v in history.history['val_loss']],
+    "accuracy":     [float(v) for v in history.history['accuracy']],
+    "val_accuracy": [float(v) for v in history.history['val_accuracy']],
 }
-if 'r2_metric' in history.history:
-    history_dict["r2_metric"]     = [float(v) for v in history.history['r2_metric']]
-    history_dict["val_r2_metric"] = [float(v) for v in history.history['val_r2_metric']]
 
 with open(f"{artifacts_dir}/training_history.json", "w", encoding='utf-8') as f:
     json.dump(history_dict, f, indent=4)
@@ -308,15 +293,11 @@ print(" Saved: artifacts/metrics/training_history.json")
 # ============================================
 #  Save test metrics
 # ============================================
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-
-# Get predictions on test set
-y_pred = model.predict(X_test_cnn, verbose=0).flatten()
+y_pred = model.predict(X_test_cnn, verbose=0)
+y_pred_classes = np.argmax(y_pred, axis=1)
 
 test_metrics = {
-    'mse': float(mean_squared_error(y_test, y_pred)),
-    'mae': float(mean_absolute_error(y_test, y_pred)),
-    'r2': float(r2_score(y_test, y_pred)),
+    'accuracy': float(accuracy_score(y_test, y_pred_classes)),
     'timestamp': datetime.now().isoformat()
 }
 
@@ -331,10 +312,7 @@ data_info = {
     "features_count":              int(X.shape[1]),
     "categorical_vars_original":   len(cat_vars),
     "constant_features_dropped":   len(suspiciousData),
-    "target_mean": float(y.mean()),
-    "target_std":  float(y.std()),
-    "target_min":  float(y.min()),
-    "target_max":  float(y.max())
+    "num_classes":                 int(len(np.unique(y)))
 }
 with open('data_info.json', 'w', encoding='utf-8') as f:
     json.dump(data_info, f, indent=4)
@@ -347,12 +325,13 @@ print(" Saved: artifacts/metadata/data_info.json")
 #  Save model metadata
 # ============================================
 model_metadata = {
-    'model_type': 'CNN_Regression',
+    'model_type': 'CNN_Classification',
     'input_shape': X_train_cnn.shape[1:],
     'num_features': len(feature_columns),
+    'num_classes': int(len(np.unique(y))),
     'num_training_samples': len(y_train),
     'num_test_samples': len(y_test),
-    'feature_columns_preview': feature_columns[:10],  # First 10 for preview
+    'feature_columns_preview': feature_columns[:10],
     'target_column': 'y',
     'training_completed': datetime.now().isoformat(),
     'hyperparameters': {
@@ -372,7 +351,6 @@ with open(f"{artifacts_dir}/metadata/model_info.json", "w", encoding='utf-8') as
     json.dump(model_metadata, f, indent=4)
 print(" Saved: artifacts/metadata/model_info.json")
 
-# Save number of features as text file for easy reading
 with open(f"{artifacts_dir}/metadata/num_features.txt", "w") as f:
     f.write(str(len(feature_columns)))
 
@@ -382,31 +360,7 @@ with open(f"{artifacts_dir}/metadata/num_features.txt", "w") as f:
 print("\n" + "="*60)
 print(" TRAINING COMPLETE - ALL ARTIFACTS GENERATED")
 print("="*60)
-print("\n Generated artifacts structure:")
-print("   artifacts/preprocessing/")
-print("   ├── feature_columns.json")
-print("   ├── scaler.pkl")
-print("   └── target_column.json")
-print("   artifacts/data/")
-print("   ├── X_train_scaled.npy")
-print("   ├── X_test_scaled.npy")
-print("   ├── X_train_cnn.npy")
-print("   ├── X_test_cnn.npy")
-print("   ├── y_train.npy")
-print("   └── y_test.npy")
-print("   artifacts/metrics/")
-print("   ├── test_metrics.json")
-print("   └── training_history.json")
-print("   artifacts/metadata/")
-print("   ├── data_info.json")
-print("   ├── model_info.json")
-print("   └── num_features.txt")
 print("   models/model.keras")
-print("\n Next steps:")
-print("   1. Run: dvc add artifacts/ models/")
-print("   2. Run: dvc push")
-print("   3. python src/preprocess_new_data.py")
-print("   4. python src/monitor.py")
 print("="*60)
 
 print("\n model.py completed successfully! Ready for monitoring and retraining.")

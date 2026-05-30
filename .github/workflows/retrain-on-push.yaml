@@ -145,7 +145,7 @@ jobs:
           echo "No changes to commit"
         else
           git commit -m "Auto-retrain: Model updated with new data ($(date +'%Y-%m-%d %H:%M:%S'))"
-          git push
+          git pull --rebase && git push
         fi
     
     - name: Upload reports

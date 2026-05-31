@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - classification-fix
+      - task3
     paths:
       - '.github/workflows/retrain-on-push.yaml'
       - 'data/*.csv'

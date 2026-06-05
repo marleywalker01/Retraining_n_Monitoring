@@ -6,8 +6,8 @@
     ],
     "num_features": 16,
     "num_classes": 7,
-    "num_training_samples": 290437,
-    "num_test_samples": 124474,
+    "num_training_samples": 290717,
+    "num_test_samples": 124594,
     "feature_columns_preview": [
         "Age",
         "Height",
@@ -21,7 +21,7 @@
         "CALC_encoded"
     ],
     "target_column": "y",
-    "training_completed": "2026-06-05T05:12:02.778320",
+    "training_completed": "2026-06-05T05:24:28.128693",
     "hyperparameters": {
         "epochs": 10,
         "batch_size": 32,
@@ -44,7 +44,7 @@
         ]
     },
     "test_performance": {
-        "accuracy": 0.9996224111059338,
-        "timestamp": "2026-06-05T05:12:02.763882"
+        "accuracy": 0.999638826909803,
+        "timestamp": "2026-06-05T05:24:28.114295"
     }
 }

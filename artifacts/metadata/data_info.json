@@ -1,6 +1,6 @@
 {
-    "train_samples": 339997,
-    "test_samples": 145714,
+    "train_samples": 340277,
+    "test_samples": 145834,
     "features_count": 16,
     "categorical_vars_original": 0,
     "constant_features_dropped": 0,

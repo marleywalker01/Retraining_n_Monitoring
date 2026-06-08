@@ -1,12 +1,12 @@
 {
-  "timestamp": "2026-06-08T12:56:55.414997",
+  "timestamp": "2026-06-08T13:14:27.585033",
   "test_metrics": {
-    "accuracy": 0.999713990822836
+    "accuracy": 0.9996955651925394
   },
   "new_metrics": {
     "accuracy": 1.0
   },
-  "accuracy_drop": -0.0002860091771640372,
+  "accuracy_drop": -0.00030443480746056295,
   "threshold": 0.05,
   "retrain_needed": false
 }

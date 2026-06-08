@@ -1,20 +1,20 @@
 {
-    "timestamp": "2026-06-08T00:37:55.980088",
+    "timestamp": "2026-06-08T00:54:45.459098",
     "model_type": "1D CNN Classifier",
     "test_size": 0.3,
     "batch_size": 32,
     "epochs": 10,
     "final_epoch": 10,
     "metrics": {
-        "accuracy": 0.9996726446461353,
-        "precision": 0.9996726655484474,
-        "recall": 0.9996726446461353,
-        "f1_score": 0.9996726305268588
+        "accuracy": 0.9996793103890607,
+        "precision": 0.9996793174456459,
+        "recall": 0.9996793103890607,
+        "f1_score": 0.9996793035433456
     },
     "training_history": {
-        "final_train_loss": 0.00045284678344614804,
-        "final_val_loss": 0.006560722831636667,
-        "final_train_accuracy": 0.9999009966850281,
-        "final_val_accuracy": 0.9965403079986572
+        "final_train_loss": 0.0005083330324850976,
+        "final_val_loss": 0.002524378476664424,
+        "final_train_accuracy": 0.9998763203620911,
+        "final_val_accuracy": 0.9997113943099976
     }
 }

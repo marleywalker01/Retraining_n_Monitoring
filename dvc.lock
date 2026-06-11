@@ -53,22 +53,22 @@ stages:
       size: 15223
     - path: train/train.csv
       hash: md5
-      md5: 99bca60d515934bf3a5c5604df85f0da
-      size: 43656091
+      md5: 6ebea0ec55cf6a63ffbb5f1fd0c097b5
+      size: 20925695
     outs:
     - path: artifacts/X_test_cnn.npy
       hash: md5
-      md5: 37e59c51383c11461450f2bf04ab4dcd
-      size: 22660480
+      md5: e183b9bee7d6b3c721b2fc528992c301
+      size: 8786944
     - path: artifacts/training_history.json
       hash: md5
-      md5: 5e48efe1e56881f1e0a5b9868332986f
-      size: 1265
+      md5: 2f6bc44357edf22cccaeb07f4e60e4cf
+      size: 1251
     - path: artifacts/y_test.npy
       hash: md5
-      md5: 3018e3f046dfd2952cc1003c43aa58f3
-      size: 1416400
+      md5: c30fd92b16db5c874cfe38aac92fbbbe
+      size: 549304
     - path: models/model.keras
       hash: md5
-      md5: a3897adddd2751df39e15b365395f2ba
+      md5: a4fc5bd6dc4375db7c9a848fe9b5b617
       size: 1550179

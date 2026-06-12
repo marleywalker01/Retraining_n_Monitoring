@@ -40,7 +40,7 @@ print("-" * 60)
 comparison = {}
 
 for model_name, data in results.items():
-    metrics = data.get("metrics", {})
+    metrics = data.get("metrics", data)
     accuracy = metrics.get("accuracy", "N/A")
     f1       = metrics.get("f1_score", "N/A")
     cv       = metrics.get("cross_val_accuracy", "N/A")

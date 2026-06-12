@@ -6,6 +6,8 @@ on:
       - main
       - classification-fix
       - task3
+      - fix-data-leakage
+      - add-sklearn-models
     paths:
       - '.github/workflows/retrain-on-push.yaml'
       - 'data/*.csv'
@@ -139,6 +141,24 @@ jobs:
       run: |
         echo "Evaluating new model..."
         python src/evaluate.py
+
+    - name: Train MLP model
+      if: env.NEW_DATA == 'true'
+      run: |
+        echo "Training MLP model..."
+        python src/model_mlp.py
+
+    - name: Train RF model
+      if: env.NEW_DATA == 'true'
+      run: |
+        echo "Training RF Model..."
+        python src/model_rf.py
+
+    - name: Compare all models
+      if: env.NEW_DATA == 'true'
+      run: |
+        echo "Comparing all models..."
+        python src/evaluate_all.py
     
     - name: Push new model and artifacts
       if: env.NEW_DATA == 'true'

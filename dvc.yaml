@@ -22,7 +22,39 @@ stages:
       - artifacts/X_test_cnn.npy
       - artifacts/y_test.npy
       - artifacts/training_history.json
+      - artifacts/data/X_train_scaled.npy
+      - artifacts/data/X_test_scaled.npy
+      - artifacts/data/y_train.npy
+      - artifacts/data/y_test.npy
 
+  train_mlp: # train the MLP classifier
+    cmd: python src/model_mlp.py
+    deps:
+      - src/model_mlp.py
+      - artifacts/data/X_train_scaled.npy
+      - artifacts/data/y_train.npy
+      - artifacts/data/X_test_scaled.npy
+      - artifacts/data/y_test.npy
+      - params.yaml
+    outs:
+      - artifacts/models/mlp_model.pkl
+      - artifacts/metrics/mlp_metrics.json:
+          cache: false
+
+  train_rf: # train the Random Forest classifier
+    cmd: python src/model_rf.py
+    deps:
+      - src/model_rf.py
+      - artifacts/data/X_train_scaled.npy
+      - artifacts/data/y_train.npy
+      - artifacts/data/X_test_scaled.npy
+      - artifacts/data/y_test.npy
+      - params.yaml
+    outs:
+      - artifacts/models/rf_model.pkl
+      - artifacts/metrics/rf_metrics.json:
+          cache: false
+  
   evaluate: # evaluate the model on test set and save metrics/plots
     cmd: python src/evaluate.py # evaluate the model and save metrics/plots
     deps: # dependencies for this stage
@@ -37,6 +69,17 @@ stages:
     metrics: # metrics to save and track with DVC
       - metrics.json:
           cache: false # don't store metrics.json in DVC cache since it's small and we want to overwrite it each time
+
+  evaluate_all: # compare all models
+    cmd: python src/evaluate_all.py
+    deps:
+      - src/evaluate_all.py
+      - artifacts/metrics/test_metrics.json
+      - artifacts/metrics/mlp_metrics.json
+      - artifacts/metrics/rf_metrics.json
+    outs:
+      - artifacts/metrics/model_comparison.json:
+          cache: false
 
 params:
   - params.yaml

@@ -101,10 +101,18 @@ jobs:
             # Combine
             combined_df = pd.concat([train_df, new_df], ignore_index=True)
             combined_df = combined_df.dropna()
+            combined_df = combined_df.drop_duplicates()
             print(f'Combined data: {len(combined_df)} rows')
+            
+            # Cap training data at 5000 rows to prevent unbounded growth
+            MAX_TRAIN_SIZE = 5000
+            if len(combined_df) > MAX_TRAIN_SIZE:
+                combined_df = combined_df.tail(MAX_TRAIN_SIZE)
+                print(f'Capped training data to {MAX_TRAIN_SIZE} rows')
             
             # Save combined data
             combined_df.to_csv('train/train.csv', index=False)
+            
             print('Combined data saved to train/train.csv')
             
             # Move new data to processed folder

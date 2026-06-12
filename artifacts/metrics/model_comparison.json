@@ -1,0 +1,24 @@
+{
+    "timestamp": "2026-06-12T13:33:32.376137",
+    "models": {
+        "CNN": {
+            "accuracy": "N/A",
+            "f1_score": "N/A",
+            "cross_val_accuracy": "N/A"
+        },
+        "MLP": {
+            "accuracy": 0.9234449760765551,
+            "f1_score": 0.92372229032134,
+            "cross_val_accuracy": 0.9212328767123289
+        },
+        "RandomForest": {
+            "accuracy": 0.9521531100478469,
+            "f1_score": 0.9521717002732227,
+            "cross_val_accuracy": 0.945890410958904
+        }
+    },
+    "best_model": {
+        "name": "RandomForest",
+        "accuracy": 0.9521531100478469
+    }
+}

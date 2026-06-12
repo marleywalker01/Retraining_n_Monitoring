@@ -53,22 +53,38 @@ stages:
       size: 15223
     - path: train/train.csv
       hash: md5
-      md5: 4138465556830a7432062aae57195b4c
-      size: 21331881
+      md5: 3a7fdfcf851b01bbf61e45f58e2fbf60
+      size: 156059
     outs:
     - path: artifacts/X_test_cnn.npy
       hash: md5
-      md5: 1d70fd3e8305b84a281cc8c2007c076b
-      size: 8955904
+      md5: 1910e5ce94cc5c35e1b85fc1ed6d02bc
+      size: 80384
+    - path: artifacts/data/X_test_scaled.npy
+      hash: md5
+      md5: 936e7ff0c3571fe1b890bb8464dd44f3
+      size: 80384
+    - path: artifacts/data/X_train_scaled.npy
+      hash: md5
+      md5: 0e385f9341524265366abdcca2a3db89
+      size: 187008
+    - path: artifacts/data/y_test.npy
+      hash: md5
+      md5: cbb987536ce666bb8aa0e144889b4228
+      size: 5144
+    - path: artifacts/data/y_train.npy
+      hash: md5
+      md5: 8bc74ff132a4b0da5c7dbb9aeeebca3b
+      size: 11808
     - path: artifacts/training_history.json
       hash: md5
-      md5: aaa4cd37f81fc8e3efd96c1f8f38fd9e
-      size: 1259
+      md5: e140cfe9c50dd81ba27b3cfa61009c2a
+      size: 1214
     - path: artifacts/y_test.npy
       hash: md5
-      md5: 13ddabc25af1c763afa71a09b44867ac
-      size: 559864
+      md5: cbb987536ce666bb8aa0e144889b4228
+      size: 5144
     - path: models/model.keras
       hash: md5
-      md5: 60e2dae6c5489889e3a26b2dc4e86567
+      md5: 8dd17cf47e04c3475448fd4a7819c344
       size: 1550179

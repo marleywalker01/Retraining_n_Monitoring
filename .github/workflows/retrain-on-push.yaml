@@ -51,7 +51,7 @@ jobs:
         dvc remote modify origin --local password ${{ secrets.DAGSHUB_TOKEN }}
     
     - name: Pull latest data and models
-      run: dvc pull --allow-missing || echo "No existing data to pull"
+      run: dvc pull --allow-missing --force || echo "No existing data to pull"
     
     - name: Check for new data
       id: check_data

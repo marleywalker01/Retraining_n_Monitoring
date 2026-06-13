@@ -16,7 +16,6 @@ stages:
     deps: # dependencies for this stage
       - src/model.py
       - train/train.csv
-      - params.yaml
     outs:
       - models/model.keras
       - artifacts/X_test_cnn.npy
@@ -80,9 +79,6 @@ stages:
     outs:
       - artifacts/metrics/model_comparison.json:
           cache: false
-
-params:
-  - params.yaml
 
 plots:
   - dvclive/plots/metrics:

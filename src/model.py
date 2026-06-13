@@ -24,13 +24,13 @@ from dvclive import Live
 with open("params.yaml") as f:
     params = yaml.safe_load(f)
 
-ANN_EPOCHS    = params["model"]["ann_epochs"]
-ANN_BATCH     = params["model"]["ann_batch_size"]
-DENSE_1       = params["model"]["ann_dense_units_1"]
-DENSE_2       = params["model"]["ann_dense_units_2"]
-DENSE_3       = params["model"]["ann_dense_units_3"]
-DROPOUT_1     = params["model"]["ann_dropout_1"]
-DROPOUT_2     = params["model"]["ann_dropout_2"]
+ANN_EPOCHS    = params["model"]["epochs"]
+ANN_BATCH     = params["model"]["batch_size"]
+DENSE_1       = params["model"]["dense_units_1"]
+DENSE_2       = params["model"]["dense_units_2"]
+DENSE_3       = params["model"]["dense_units_3"]
+DROPOUT_1     = params["model"]["dropout_1"]
+DROPOUT_2     = params["model"]["dropout_2"]
 SEED          = params["data"]["random_seed"]
 TEST_SIZE     = params["data"]["test_size"]
 ES_PATIENCE   = params["callbacks"]["early_stopping_patience"]

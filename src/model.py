@@ -11,8 +11,8 @@ import json
 from datetime import datetime
 from io import StringIO
 import tensorflow as tf
-from tensorflow.keras import Sequential
-from tensorflow.keras.layers import Dense, Dropout, Flatten, Conv1D, MaxPooling1D
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Dropout
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
@@ -24,23 +24,20 @@ from dvclive import Live
 with open("params.yaml") as f:
     params = yaml.safe_load(f)
 
-EPOCHS        = params["model"]["epochs"]
-BATCH_SIZE    = params["model"]["batch_size"]
-LEARNING_RATE = params["model"]["learning_rate"]
+ANN_EPOCHS    = params["model"]["ann_epochs"]
+ANN_BATCH     = params["model"]["ann_batch_size"]
+DENSE_1       = params["model"]["ann_dense_units_1"]
+DENSE_2       = params["model"]["ann_dense_units_2"]
+DENSE_3       = params["model"]["ann_dense_units_3"]
+DROPOUT_1     = params["model"]["ann_dropout_1"]
+DROPOUT_2     = params["model"]["ann_dropout_2"]
 SEED          = params["data"]["random_seed"]
 TEST_SIZE     = params["data"]["test_size"]
-CNN_FILTERS   = params["model"]["cnn_filters"]
-KERNEL_SIZE   = params["model"]["kernel_size"]
-POOL_SIZE     = params["model"]["pool_size"]
-DENSE_1       = params["model"]["dense_units_1"]
-DENSE_2       = params["model"]["dense_units_2"]
-DENSE_3       = params["model"]["dense_units_3"]
-DROPOUT_1     = params["model"]["dropout_1"]
-DROPOUT_2     = params["model"]["dropout_2"]
 ES_PATIENCE   = params["callbacks"]["early_stopping_patience"]
 LR_PATIENCE   = params["callbacks"]["reduce_lr_patience"]
 LR_FACTOR     = params["callbacks"]["reduce_lr_factor"]
 LR_MIN        = params["callbacks"]["reduce_lr_min_lr"]
+METRICS_PATH  = params["evaluate"]["metrics_path"]
 
 # ── Directories ────────────────────────────────────────────
 artifacts_dir = "artifacts"
@@ -52,15 +49,13 @@ os.makedirs(f"{artifacts_dir}/metadata", exist_ok=True)
 os.makedirs("models", exist_ok=True)
 
 print("=" * 50)
-print("STARTING CNN CLASSIFICATION MODEL — TRAINING")
+print("STARTING ANN CLASSIFICATION MODEL — TRAINING")
 print("=" * 50)
 
 # ── Load data ──────────────────────────────────────────────
 for path in ["train/train.csv", "test/test.csv"]:
     if not os.path.exists(path):
         print(f"ERROR: {path} not found!")
-        print("CWD:", os.getcwd())
-        print("Files:", os.listdir('.'))
         sys.exit(1)
 
 print("\nLoading data...")
@@ -111,20 +106,14 @@ X = X.fillna(X.mean()).fillna(0).values
 y = data["y"].values
 print(f"X: {X.shape}  y: {y.shape}")
 
-# ============================================
-#  Save feature column names (for monitor.py)
-# ============================================
+# ── Save feature column names ──────────────────────────────
 feature_columns = list(data.drop("y", axis=1).columns)
 with open(f"{artifacts_dir}/preprocessing/feature_columns.json", "w", encoding='utf-8') as f:
     json.dump(feature_columns, f, indent=4)
-print(f" Saved: {artifacts_dir}/preprocessing/feature_columns.json ({len(feature_columns)} features)")
-
-# Save original feature columns to root (backward compatibility)
 with open(f"{artifacts_dir}/feature_columns.json", "w", encoding='utf-8') as f:
     json.dump(feature_columns, f, indent=4)
-print(f" Saved: {artifacts_dir}/feature_columns.json (backward compat)")
+print(f" Saved: feature_columns.json ({len(feature_columns)} features)")
 
-# Save target column info
 with open(f"{artifacts_dir}/preprocessing/target_column.json", "w", encoding='utf-8') as f:
     json.dump({"target_column": "y"}, f)
 
@@ -134,57 +123,34 @@ X_train, X_test, y_train, y_test = train_test_split(
 )
 print(f"X_train: {X_train.shape}  X_test: {X_test.shape}")
 
-# ============================================
-#  Create and save scaler
-# ============================================
+# ── Scaling ────────────────────────────────────────────────
 print("\n Creating and saving scaler...")
 scaler = StandardScaler()
 X_train_scaled = scaler.fit_transform(X_train)
-X_test_scaled = scaler.transform(X_test)
+X_test_scaled  = scaler.transform(X_test)
 print(f" Features scaled: mean≈0, std≈1")
 
-# Save scaler
 joblib.dump(scaler, f"{artifacts_dir}/preprocessing/scaler.pkl")
 print(f" Saved scaler to {artifacts_dir}/preprocessing/scaler.pkl")
 
-# ============================================
-#  Save scaled data (as backup)
-# ============================================
+# ── Save scaled data for sklearn models ───────────────────
 np.save(f"{artifacts_dir}/data/X_train_scaled.npy", X_train_scaled)
-np.save(f"{artifacts_dir}/data/X_test_scaled.npy", X_test_scaled)
-np.save(f"{artifacts_dir}/data/y_train.npy", y_train)
-np.save(f"{artifacts_dir}/data/y_test.npy", y_test)
+np.save(f"{artifacts_dir}/data/X_test_scaled.npy",  X_test_scaled)
+np.save(f"{artifacts_dir}/data/y_train.npy",         y_train)
+np.save(f"{artifacts_dir}/data/y_test.npy",          y_test)
 print(f" Saved scaled data to {artifacts_dir}/data/")
 
-# ── Reshape for 1D CNN: (samples, features, 1) ────────────
-X_train_cnn = X_train_scaled.reshape(X_train_scaled.shape[0], X_train_scaled.shape[1], 1)
-X_test_cnn  = X_test_scaled.reshape(X_test_scaled.shape[0], X_test_scaled.shape[1], 1)
-print(f"CNN shapes — train: {X_train_cnn.shape}  test: {X_test_cnn.shape}")
-
 # ── Save split data for evaluate.py ───────────────────────
-np.save(f"{artifacts_dir}/X_test_cnn.npy",  X_test_cnn)
-np.save(f"{artifacts_dir}/y_test.npy",      y_test)
-np.save(f"{artifacts_dir}/data/X_test_cnn.npy", X_test_cnn)
-np.save(f"{artifacts_dir}/data/X_train_cnn.npy", X_train_cnn)
+np.save(f"{artifacts_dir}/X_test_cnn.npy", X_test_scaled)
+np.save(f"{artifacts_dir}/y_test.npy",     y_test)
 print(" Saved: artifacts/X_test_cnn.npy, artifacts/y_test.npy")
-print(" Saved: artifacts/data/X_test_cnn.npy, artifacts/data/X_train_cnn.npy")
 
-# ── Build model ────────────────────────────────────────────
+# ── Build ANN model ────────────────────────────────────────
 tf.random.set_seed(SEED)
+num_features = X_train_scaled.shape[1]
 
 model = Sequential([
-    Conv1D(CNN_FILTERS[0], kernel_size=KERNEL_SIZE, activation='relu',
-           input_shape=(X_train_cnn.shape[1], 1), padding='same'),
-    MaxPooling1D(pool_size=POOL_SIZE),
-
-    Conv1D(CNN_FILTERS[1], kernel_size=KERNEL_SIZE, activation='relu', padding='same'),
-    MaxPooling1D(pool_size=POOL_SIZE),
-
-    Conv1D(CNN_FILTERS[2], kernel_size=KERNEL_SIZE, activation='relu', padding='same'),
-    MaxPooling1D(pool_size=POOL_SIZE),
-
-    Flatten(),
-    Dense(DENSE_1, activation='relu'),
+    Dense(DENSE_1, activation='relu', input_shape=(num_features,)),
     Dropout(DROPOUT_1),
     Dense(DENSE_2, activation='relu'),
     Dropout(DROPOUT_2),
@@ -193,20 +159,17 @@ model = Sequential([
 ])
 
 model.compile(
+    optimizer='adam',
     loss='sparse_categorical_crossentropy',
-    optimizer=tf.keras.optimizers.Adam(learning_rate=LEARNING_RATE),
     metrics=['accuracy']
 )
 
 model.summary()
 
-# Capture summary to a string
 stream = StringIO()
 model.summary(print_fn=lambda x: stream.write(x + '\n'))
-summary_str = stream.getvalue()
-
 with open('model_summary.txt', 'w', encoding='utf-8') as f:
-    f.write(summary_str)
+    f.write(stream.getvalue())
 print("Saved: model_summary.txt")
 
 # ── Callbacks ──────────────────────────────────────────────
@@ -220,16 +183,15 @@ callbacks = [
 # ── Train ──────────────────────────────────────────────────
 print("\nTraining model...")
 with Live(dir="dvclive", report="html") as live:
-    live.log_param("epochs",      EPOCHS)
-    live.log_param("batch_size",  BATCH_SIZE)
-    live.log_param("lr",          LEARNING_RATE)
-    live.log_param("cnn_filters", str(CNN_FILTERS))
+    live.log_param("ann_epochs",     ANN_EPOCHS)
+    live.log_param("ann_batch_size", ANN_BATCH)
+    live.log_param("dense_units",    str([DENSE_1, DENSE_2, DENSE_3]))
 
     history = model.fit(
-        X_train_cnn, y_train,
-        batch_size=BATCH_SIZE,
-        epochs=EPOCHS,
-        validation_data=(X_test_cnn, y_test),
+        X_train_scaled, y_train,
+        epochs=ANN_EPOCHS,
+        batch_size=ANN_BATCH,
+        validation_data=(X_test_scaled, y_test),
         callbacks=callbacks,
         verbose=1
     )
@@ -245,37 +207,30 @@ print("Training completed!")
 
 # ── Save model ─────────────────────────────────────────────
 model.save("models/model.keras")
-model.save(f"{artifacts_dir}/cnn_classification_model.h5")
 print(" Saved: models/model.keras")
-print(f" Saved: {artifacts_dir}/cnn_classification_model.h5")
 
 # ── Training history plots ─────────────────────────────────
-fig, axes = plt.subplots(1, 2, figsize=(15, 5))
+fig, axes = plt.subplots(1, 2, figsize=(12, 4))
 
-axes[0].plot(history.history['loss'],     label='Train Loss')
-axes[0].plot(history.history['val_loss'], label='Val Loss')
-axes[0].set_title('Model Loss')
+axes[0].plot(history.history['accuracy'],     label='Train Accuracy')
+axes[0].plot(history.history['val_accuracy'], label='Validation Accuracy')
 axes[0].set_xlabel('Epoch')
-axes[0].set_ylabel('Loss')
+axes[0].set_ylabel('Accuracy')
 axes[0].legend()
-axes[0].grid(True)
 
-axes[1].plot(history.history['accuracy'],     label='Train Accuracy')
-axes[1].plot(history.history['val_accuracy'], label='Val Accuracy')
-axes[1].set_title('Model Accuracy')
+axes[1].plot(history.history['loss'],     label='Train Loss')
+axes[1].plot(history.history['val_loss'], label='Validation Loss')
 axes[1].set_xlabel('Epoch')
-axes[1].set_ylabel('Accuracy')
+axes[1].set_ylabel('Loss')
 axes[1].legend()
-axes[1].grid(True)
 
 plt.tight_layout()
 plt.savefig('model_results.png',                  dpi=300, bbox_inches='tight')
 plt.savefig(f'{artifacts_dir}/model_results.png', dpi=300, bbox_inches='tight')
 plt.close()
 print(" Saved: model_results.png")
-print(f" Saved: {artifacts_dir}/model_results.png")
 
-# ── Save training history for evaluate.py ─────────────────
+# ── Save training history ──────────────────────────────────
 history_dict = {
     "loss":         [float(v) for v in history.history['loss']],
     "val_loss":     [float(v) for v in history.history['val_loss']],
@@ -287,17 +242,14 @@ with open(f"{artifacts_dir}/training_history.json", "w", encoding='utf-8') as f:
     json.dump(history_dict, f, indent=4)
 with open(f"{artifacts_dir}/metrics/training_history.json", "w", encoding='utf-8') as f:
     json.dump(history_dict, f, indent=4)
-print(" Saved: artifacts/training_history.json")
-print(" Saved: artifacts/metrics/training_history.json")
+print(" Saved: training_history.json")
 
-# ============================================
-#  Save test metrics
-# ============================================
-y_pred = model.predict(X_test_cnn, verbose=0)
+# ── Save test metrics ──────────────────────────────────────
+y_pred = model.predict(X_test_scaled, verbose=0)
 y_pred_classes = np.argmax(y_pred, axis=1)
 
 test_metrics = {
-    'accuracy': float(accuracy_score(y_test, y_pred_classes)),
+    'accuracy':  float(accuracy_score(y_test, y_pred_classes)),
     'timestamp': datetime.now().isoformat()
 }
 
@@ -307,26 +259,23 @@ print(" Saved: artifacts/metrics/test_metrics.json")
 
 # ── Save data info ─────────────────────────────────────────
 data_info = {
-    "train_samples":               int(X_train.shape[0]),
-    "test_samples":                int(X_test.shape[0]),
-    "features_count":              int(X.shape[1]),
-    "categorical_vars_original":   len(cat_vars),
-    "constant_features_dropped":   len(suspiciousData),
-    "num_classes":                 int(len(np.unique(y)))
+    "train_samples":             int(X_train.shape[0]),
+    "test_samples":              int(X_test.shape[0]),
+    "features_count":            int(X.shape[1]),
+    "categorical_vars_original": len(cat_vars),
+    "constant_features_dropped": len(suspiciousData),
+    "num_classes":               int(len(np.unique(y)))
 }
 with open('data_info.json', 'w', encoding='utf-8') as f:
     json.dump(data_info, f, indent=4)
 with open(f"{artifacts_dir}/metadata/data_info.json", 'w', encoding='utf-8') as f:
     json.dump(data_info, f, indent=4)
 print(" Saved: data_info.json")
-print(" Saved: artifacts/metadata/data_info.json")
 
-# ============================================
-#  Save model metadata
-# ============================================
+# ── Save model metadata ────────────────────────────────────
 model_metadata = {
-    'model_type': 'CNN_Classification',
-    'input_shape': X_train_cnn.shape[1:],
+    'model_type': 'ANN_Classification',
+    'input_shape': (num_features,),
     'num_features': len(feature_columns),
     'num_classes': int(len(np.unique(y))),
     'num_training_samples': len(y_train),
@@ -335,13 +284,9 @@ model_metadata = {
     'target_column': 'y',
     'training_completed': datetime.now().isoformat(),
     'hyperparameters': {
-        'epochs': EPOCHS,
-        'batch_size': BATCH_SIZE,
-        'learning_rate': LEARNING_RATE,
-        'cnn_filters': CNN_FILTERS,
-        'kernel_size': KERNEL_SIZE,
-        'pool_size': POOL_SIZE,
-        'dense_units': [DENSE_1, DENSE_2, DENSE_3],
+        'epochs':        ANN_EPOCHS,
+        'batch_size':    ANN_BATCH,
+        'dense_units':   [DENSE_1, DENSE_2, DENSE_3],
         'dropout_rates': [DROPOUT_1, DROPOUT_2]
     },
     'test_performance': test_metrics
@@ -354,13 +299,7 @@ print(" Saved: artifacts/metadata/model_info.json")
 with open(f"{artifacts_dir}/metadata/num_features.txt", "w") as f:
     f.write(str(len(feature_columns)))
 
-# ============================================
-# FINAL SUMMARY
-# ============================================
 print("\n" + "="*60)
 print(" TRAINING COMPLETE - ALL ARTIFACTS GENERATED")
 print("="*60)
-print("   models/model.keras")
-print("="*60)
-
-print("\n model.py completed successfully! Ready for monitoring and retraining.")
+print(" model.py completed successfully!")

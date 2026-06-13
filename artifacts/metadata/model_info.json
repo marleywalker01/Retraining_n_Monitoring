@@ -1,8 +1,7 @@
 {
-    "model_type": "CNN_Classification",
+    "model_type": "ANN_Classification",
     "input_shape": [
-        16,
-        1
+        16
     ],
     "num_features": 16,
     "num_classes": 7,
@@ -21,18 +20,10 @@
         "CALC_encoded"
     ],
     "target_column": "y",
-    "training_completed": "2026-06-12T13:33:13.493083",
+    "training_completed": "2026-06-13T07:53:47.458301",
     "hyperparameters": {
         "epochs": 10,
         "batch_size": 32,
-        "learning_rate": 0.0001,
-        "cnn_filters": [
-            64,
-            128,
-            64
-        ],
-        "kernel_size": 3,
-        "pool_size": 2,
         "dense_units": [
             256,
             128,
@@ -44,7 +35,7 @@
         ]
     },
     "test_performance": {
-        "accuracy": 0.6188197767145136,
-        "timestamp": "2026-06-12T13:33:13.492214"
+        "accuracy": 0.9090909090909091,
+        "timestamp": "2026-06-13T07:53:47.457811"
     }
 }

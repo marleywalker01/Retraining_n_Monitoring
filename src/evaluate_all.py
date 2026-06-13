@@ -10,7 +10,7 @@ print("=" * 50)
 
 # ── Load metrics from each model ───────────────────────────
 metrics_paths = {
-    "CNN":          "artifacts/metrics/test_metrics.json",
+    "ANN":          "artifacts/metrics/test_metrics.json",
     "MLP":          "artifacts/metrics/mlp_metrics.json",
     "RandomForest": "artifacts/metrics/rf_metrics.json"
 }
